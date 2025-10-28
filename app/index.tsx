@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React from "react";
 import {
   Dimensions,
+  ImageBackground,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -23,67 +24,82 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={[
-        Colors.light.lightBlue,
-        Colors.light.background,
-        Colors.light.lightOrange,
-      ]}
-      style={styles.container}
+    <ImageBackground
+      source={require("../assets/images/tamir.jpg")}
+      style={styles.backgroundImage}
+      imageStyle={{ opacity: 0.8 }} // 🔸 Resmin saydamlığını buradan ayarlayabilirsin (0.1 - 0.4 arası ideal)
     >
-      <View style={styles.content}>
-        {/* Logo Section */}
-        <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Ionicons name="car-sport" size={60} color={Colors.light.primary} />
+      <LinearGradient
+        colors={[
+          "rgba(227, 242, 253, 0.5)",
+          "rgba(255, 255, 255, 0.2)",
+          "rgba(255, 243, 224, 0.5)",
+        ]}
+        style={styles.container}
+      >
+        <View style={styles.content}>
+          {/* Logo Section */}
+          <View style={styles.logoContainer}>
+            <View style={styles.logoCircle}>
+              <Ionicons
+                name="car-sport"
+                size={60}
+                color={Colors.light.primary}
+              />
+            </View>
+            <Text style={styles.appTitle}>Tamircim</Text>
+            <Text style={styles.appSubtitle}>Güvenilir Araç Tamiri</Text>
           </View>
-          <Text style={styles.appTitle}>Tamircim</Text>
-          <Text style={styles.appSubtitle}>Güvenilir Araç Tamiri</Text>
-        </View>
 
-        {/* Buttons Section */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.customerButton]}
-            onPress={handleCustomerLogin}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="person"
-              size={24}
-              color="white"
-              style={styles.buttonIcon}
-            />
-            <Text style={styles.buttonText}>Müşteri Girişi</Text>
-          </TouchableOpacity>
+          {/* Buttons Section */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.button, styles.customerButton]}
+              onPress={handleCustomerLogin}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="person"
+                size={24}
+                color="white"
+                style={styles.buttonIcon}
+              />
+              <Text style={styles.buttonText}>Müşteri Girişi</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.button, styles.mechanicButton]}
-            onPress={handleMechanicLogin}
-            activeOpacity={0.8}
-          >
-            <Ionicons
-              name="construct"
-              size={24}
-              color="white"
-              style={styles.buttonIcon}
-            />
-            <Text style={styles.buttonText}>Tamirci Girişi</Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.button, styles.mechanicButton]}
+              onPress={handleMechanicLogin}
+              activeOpacity={0.8}
+            >
+              <Ionicons
+                name="construct"
+                size={24}
+                color="white"
+                style={styles.buttonIcon}
+              />
+              <Text style={styles.buttonText}>Tamirci Girişi</Text>
+            </TouchableOpacity>
+          </View>
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Hızlı, güvenilir ve kaliteli hizmet
-          </Text>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              Hızlı, güvenilir ve kaliteli hizmet
+            </Text>
+          </View>
         </View>
-      </View>
-    </LinearGradient>
+      </LinearGradient>
+    </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
+  backgroundImage: {
+    flex: 1,
+    width: "100%",
+    height: "100%",
+  },
   container: {
     flex: 1,
   },
@@ -106,10 +122,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
@@ -138,10 +151,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     borderRadius: 15,
     shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
     elevation: 6,

@@ -55,6 +55,8 @@ export interface Job {
   customerName?: string;
   mechanicName?: string;
   carInfo?: string;
+  paymentAmount?: number;
+  workDetails?: string;
 }
 
 export interface Message {
@@ -117,6 +119,8 @@ export const mockCustomers: Customer[] = [
     ]
   }
 ];
+
+export const mockCars: Car[] = mockCustomers.flatMap(customer => customer.cars);
 
 export const mockMechanics: Mechanic[] = [
   {

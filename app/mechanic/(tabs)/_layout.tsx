@@ -1,7 +1,7 @@
-import React from 'react';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import Colors from '@/constants/Colors';
+import Colors from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+import React from "react";
 
 export default function MechanicTabLayout() {
   return (
@@ -18,22 +18,23 @@ export default function MechanicTabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 12,
-          fontWeight: '500',
+          fontWeight: "500",
         },
         headerStyle: {
           backgroundColor: Colors.light.secondary,
         },
-        headerTintColor: 'white',
+        headerTintColor: "white",
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: "bold",
         },
       }}
     >
       <Tabs.Screen
         name="map"
         options={{
-          title: 'Harita',
-          headerTitle: 'Tamirci Haritası',
+          title: "Harita",
+          headerTitle: "Tamirci Haritası",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="map" size={size} color={color} />
           ),
@@ -42,8 +43,9 @@ export default function MechanicTabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          title: 'Ana Sayfa',
-          headerTitle: 'Tamircim - Tamirci',
+          title: "Ana Sayfa",
+          headerTitle: "Tamircim - Tamirci",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -52,8 +54,9 @@ export default function MechanicTabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profil',
-          headerTitle: 'Tamirci Profili',
+          title: "Profil",
+          headerTitle: "Tamirci Profili",
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),

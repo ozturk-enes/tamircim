@@ -20,28 +20,28 @@ export default function LoginLayout() {
         name="customerLogin"
         options={{
           title: "Müşteri Girişi",
-          headerShown: true,
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="mechanicLogin"
         options={{
           title: "Tamirci Girişi",
-          headerShown: true,
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="customerRegister"
         options={{
           title: "Müşteri Kayıt",
-          headerShown: true,
+          headerShown: false,
         }}
       />
       <Stack.Screen
         name="mechanicRegister"
         options={{
           title: "Tamirci Kayıt",
-          headerShown: true,
+          headerShown: false,
         }}
       />
     </Stack>
