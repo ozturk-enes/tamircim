@@ -1,12 +1,15 @@
 import Colors from "@/constants/Colors";
 import { mockUsers } from "@/constants/mockData";
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
   Alert,
+  Animated,
   Dimensions,
   FlatList,
+  Linking,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,20 +20,23 @@ import {
 
 const { width } = Dimensions.get("window");
 
-// Mock mechanic data with ratings and pricing
+// Enhanced mechanic data with additional details
 const mechanicsWithDetails = mockUsers.mechanics.map((mechanic, index) => ({
   ...mechanic,
-  rating: (Math.random() * 1.5 + 3.5).toFixed(1), // Rating between 3.5-5.0
-  averagePrice: Math.floor(Math.random() * 200 + 150), // Price between 150-350
   distance: (Math.random() * 10 + 0.5).toFixed(1), // Distance 0.5-10.5 km
-  isOnline: Math.random() > 0.3, // 70% chance of being online
   completedJobs: Math.floor(Math.random() * 100 + 20), // 20-120 completed jobs
   responseTime: Math.floor(Math.random() * 30 + 5), // 5-35 minutes response time
+  serviceTitle: mechanic.specialties[0] + " Uzmanı", // Primary service title
+  experience: Math.floor(Math.random() * 15 + 2) + " yıl", // 2-17 years experience
+  averageResponseTime: Math.floor(Math.random() * 60 + 15) + " dk", // 15-75 minutes
 }));
 
 export default function CustomerHomeScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedMechanic, setSelectedMechanic] = useState<any>(null);
+  const [modalAnimation] = useState(new Animated.Value(0));
 
   const categories = [
     "Tümü",
@@ -55,72 +61,128 @@ export default function CustomerHomeScreen() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleMechanicPress = (mechanic: any) => {
-    Alert.alert(
-      mechanic.name,
-      `Puan: ${mechanic.rating}/5.0\nOrtalama Fiyat: ₺${
-        mechanic.averagePrice
-      }\nUzmanlık: ${mechanic.specialties.join(", ")}\nMesafe: ${
-        mechanic.distance
-      } km\nTamamlanan İş: ${mechanic.completedJobs}`,
-      [
-        { text: "İptal", style: "cancel" },
-        {
-          text: "Ara",
-          onPress: () =>
-            Alert.alert("Aranıyor...", `${mechanic.phone} aranıyor`),
-        },
-        {
-          text: "Mesaj",
-          onPress: () =>
-            Alert.alert("Mesaj", "Mesaj özelliği yakında eklenecek!"),
-        },
-        {
-          text: "Detaylar",
-          onPress: () =>
-            Alert.alert("Detaylar", "Detay sayfası yakında eklenecek!"),
-        },
-      ]
-    );
+  const openModal = (mechanic: any) => {
+    setSelectedMechanic(mechanic);
+    setModalVisible(true);
+    Animated.spring(modalAnimation, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start();
+  };
+
+  const closeModal = () => {
+    Animated.spring(modalAnimation, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 8,
+    }).start(() => {
+      setModalVisible(false);
+      setSelectedMechanic(null);
+    });
+  };
+
+  const handlePhoneCall = (phoneNumber: string) => {
+    const phoneUrl = `tel:${phoneNumber}`;
+    Linking.canOpenURL(phoneUrl)
+      .then((supported) => {
+        if (supported) {
+          return Linking.openURL(phoneUrl);
+        } else {
+          Alert.alert("Hata", "Telefon uygulaması açılamıyor");
+        }
+      })
+      .catch((err) => {
+        console.error("Phone call error:", err);
+        Alert.alert("Hata", "Arama yapılırken bir hata oluştu");
+      });
+  };
+
+  const handleAppointment = () => {
+    Alert.alert("Randevu Talebi", "Randevu sistemi yakında aktif olacak!", [
+      { text: "Tamam" },
+    ]);
   };
 
   const renderMechanicCard = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.mechanicCard}
-      onPress={() => handleMechanicPress(item)}
+      onPress={() => openModal(item)}
+      activeOpacity={0.8}
+      accessible={true}
+      accessibilityLabel={`${item.name} tamirci kartı`}
+      accessibilityHint="Detayları görmek için dokunun"
     >
+      {/* Service Title Header */}
+      <View style={styles.serviceHeader}>
+        <Text style={styles.serviceTitle}>{item.serviceTitle}</Text>
+        <View
+          style={[
+            styles.onlineIndicator,
+            {
+              backgroundColor: item.isOnline
+                ? Colors.light.success
+                : Colors.light.tabIconDefault,
+            },
+          ]}
+        />
+      </View>
+
+      {/* Main Content */}
       <View style={styles.mechanicHeader}>
         <View style={styles.mechanicAvatar}>
-          <Ionicons name="person" size={24} color="white" />
+          <Ionicons name="person" size={28} color="white" />
         </View>
         <View style={styles.mechanicInfo}>
-          <View style={styles.mechanicNameRow}>
-            <Text style={styles.mechanicName}>{item.name}</Text>
-            <View
-              style={[
-                styles.onlineIndicator,
-                {
-                  backgroundColor: item.isOnline
-                    ? Colors.light.success
-                    : Colors.light.tabIconDefault,
-                },
-              ]}
+          <Text style={styles.mechanicName}>{item.name}</Text>
+
+          {/* Phone Number */}
+          <TouchableOpacity
+            style={styles.phoneContainer}
+            onPress={() => handlePhoneCall(item.phone)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="call" size={14} color={Colors.light.primary} />
+            <Text style={styles.phoneText}>{item.phone}</Text>
+          </TouchableOpacity>
+
+          {/* Address */}
+          <View style={styles.addressContainer}>
+            <Ionicons
+              name="location"
+              size={14}
+              color={Colors.light.tabIconDefault}
             />
+            <Text style={styles.addressText} numberOfLines={1}>
+              {item.location.address}
+            </Text>
           </View>
-          <View style={styles.ratingRow}>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={14} color="#FFD700" />
-              <Text style={styles.rating}>{item.rating}</Text>
-              <Text style={styles.ratingCount}>({item.completedJobs})</Text>
-            </View>
-            <Text style={styles.averagePrice}>₺{item.averagePrice}</Text>
+
+          {/* Working Hours */}
+          <View style={styles.workingHoursContainer}>
+            <Ionicons
+              name="time"
+              size={14}
+              color={Colors.light.tabIconDefault}
+            />
+            <Text style={styles.workingHoursText}>{item.workingHours}</Text>
           </View>
-          <Text style={styles.category} numberOfLines={1}>
-            {item.specialties[0]}
-          </Text>
         </View>
       </View>
 
+      {/* Rating and Price Section */}
+      <View style={styles.ratingPriceSection}>
+        <View style={styles.ratingContainer}>
+          <Ionicons name="star" size={16} color="#FFD700" />
+          <Text style={styles.rating}>{item.rating}</Text>
+          <Text style={styles.ratingCount}>({item.reviewCount})</Text>
+        </View>
+        <Text style={styles.priceRange}>{item.priceRange}</Text>
+      </View>
+
+      {/* Stats Footer */}
       <View style={styles.mechanicFooter}>
         <View style={styles.mechanicStats}>
           <View style={styles.statItem}>
@@ -133,14 +195,26 @@ export default function CustomerHomeScreen() {
           </View>
           <View style={styles.statItem}>
             <Ionicons
-              name="time"
+              name="briefcase"
               size={12}
               color={Colors.light.tabIconDefault}
             />
-            <Text style={styles.statText}>{item.responseTime} dk</Text>
+            <Text style={styles.statText}>{item.experience}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons
+              name="checkmark-circle"
+              size={12}
+              color={Colors.light.success}
+            />
+            <Text style={styles.statText}>{item.completedJobs} iş</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.contactButton}>
+        <TouchableOpacity
+          style={styles.contactButton}
+          onPress={() => handlePhoneCall(item.phone)}
+          activeOpacity={0.8}
+        >
           <Ionicons name="call" size={16} color="white" />
         </TouchableOpacity>
       </View>
@@ -149,22 +223,6 @@ export default function CustomerHomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={[Colors.light.primary, Colors.light.lightBlue]}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>Merhaba!</Text>
-            <Text style={styles.userName}>Müşteri Adı</Text>
-          </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -254,6 +312,181 @@ export default function CustomerHomeScreen() {
           )}
         />
       </View>
+
+      {/* Enhanced Modal */}
+      <Modal
+        visible={modalVisible}
+        transparent={true}
+        animationType="none"
+        onRequestClose={closeModal}
+        statusBarTranslucent={true}
+      >
+        <View style={styles.modalOverlay}>
+          <Animated.View
+            style={[
+              styles.modalContent,
+              Platform.OS === "web"
+                ? styles.modalContentWeb
+                : styles.modalContentMobile,
+              {
+                transform: [
+                  {
+                    scale: modalAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.8, 1],
+                    }),
+                  },
+                ],
+                opacity: modalAnimation,
+              },
+            ]}
+          >
+            {selectedMechanic && (
+              <>
+                {/* Modal Header */}
+                <View style={styles.modalHeader}>
+                  <View style={styles.modalTitleContainer}>
+                    <Text style={styles.modalTitle}>
+                      {selectedMechanic.serviceTitle}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.closeButton}
+                      onPress={closeModal}
+                      accessible={true}
+                      accessibilityLabel="Kapat"
+                    >
+                      <Ionicons
+                        name="close"
+                        size={24}
+                        color={Colors.light.tabIconDefault}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  <View
+                    style={[
+                      styles.modalOnlineIndicator,
+                      {
+                        backgroundColor: selectedMechanic.isOnline
+                          ? Colors.light.success
+                          : Colors.light.tabIconDefault,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.onlineText}>
+                      {selectedMechanic.isOnline ? "Çevrimiçi" : "Çevrimdışı"}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Mechanic Info */}
+                <View style={styles.modalMechanicInfo}>
+                  <View style={styles.modalAvatar}>
+                    <Ionicons name="person" size={32} color="white" />
+                  </View>
+                  <View style={styles.modalInfoText}>
+                    <Text style={styles.modalMechanicName}>
+                      {selectedMechanic.name}
+                    </Text>
+                    <View style={styles.modalRating}>
+                      <Ionicons name="star" size={18} color="#FFD700" />
+                      <Text style={styles.modalRatingText}>
+                        {selectedMechanic.rating} (
+                        {selectedMechanic.reviewCount} değerlendirme)
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Details Grid */}
+                <View style={styles.detailsGrid}>
+                  <View style={styles.detailItem}>
+                    <Ionicons
+                      name="call"
+                      size={16}
+                      color={Colors.light.primary}
+                    />
+                    <Text style={styles.detailLabel}>Telefon</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedMechanic.phone}
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons
+                      name="location"
+                      size={16}
+                      color={Colors.light.primary}
+                    />
+                    <Text style={styles.detailLabel}>Adres</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedMechanic.location.address}
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons
+                      name="time"
+                      size={16}
+                      color={Colors.light.primary}
+                    />
+                    <Text style={styles.detailLabel}>Çalışma Saatleri</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedMechanic.workingHours}
+                    </Text>
+                  </View>
+                  <View style={styles.detailItem}>
+                    <Ionicons
+                      name="cash"
+                      size={16}
+                      color={Colors.light.primary}
+                    />
+                    <Text style={styles.detailLabel}>Fiyat Aralığı</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedMechanic.priceRange}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Specialties */}
+                <View style={styles.specialtiesContainer}>
+                  <Text style={styles.specialtiesTitle}>Uzmanlık Alanları</Text>
+                  <View style={styles.specialtiesGrid}>
+                    {selectedMechanic.specialties.map(
+                      (specialty: string, index: number) => (
+                        <View key={index} style={styles.specialtyChip}>
+                          <Text style={styles.specialtyText}>{specialty}</Text>
+                        </View>
+                      )
+                    )}
+                  </View>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.appointmentButton}
+                    onPress={handleAppointment}
+                    activeOpacity={0.8}
+                    accessible={true}
+                    accessibilityLabel="Randevu al"
+                  >
+                    <Ionicons name="calendar" size={20} color="white" />
+                    <Text style={styles.appointmentButtonText}>Randevu Al</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.callButton}
+                    onPress={() => handlePhoneCall(selectedMechanic.phone)}
+                    activeOpacity={0.8}
+                    accessible={true}
+                    accessibilityLabel="Ara"
+                  >
+                    <Ionicons name="call" size={20} color="white" />
+                    <Text style={styles.callButtonText}>Ara</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -382,6 +615,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 20,
   },
+  // Enhanced Mechanic Card Styles
   mechanicCard: {
     backgroundColor: "white",
     borderRadius: 16,
@@ -390,79 +624,134 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 3,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.05)",
+  },
+  serviceHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.lightGray,
+  },
+  serviceTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.light.primary,
+    flex: 1,
   },
   mechanicHeader: {
     flexDirection: "row",
     marginBottom: 12,
   },
   mechanicAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
+    shadowColor: Colors.light.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   mechanicInfo: {
     flex: 1,
   },
-  mechanicNameRow: {
+  mechanicName: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.light.text,
+    marginBottom: 6,
+  },
+  phoneContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+    paddingVertical: 2,
+  },
+  phoneText: {
+    fontSize: 14,
+    color: Colors.light.primary,
+    marginLeft: 6,
+    fontWeight: "500",
+  },
+  addressContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 4,
   },
-  mechanicName: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: Colors.light.text,
+  addressText: {
+    fontSize: 13,
+    color: Colors.light.tabIconDefault,
+    marginLeft: 6,
     flex: 1,
   },
-  onlineIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginLeft: 8,
+  workingHoursContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
   },
-  ratingRow: {
+  workingHoursText: {
+    fontSize: 13,
+    color: Colors.light.tabIconDefault,
+    marginLeft: 6,
+  },
+  ratingPriceSection: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.light.background,
+    borderRadius: 8,
   },
   ratingContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
   rating: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "600",
     color: Colors.light.text,
     marginLeft: 4,
   },
   ratingCount: {
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.light.tabIconDefault,
-    marginLeft: 2,
+    marginLeft: 4,
   },
-  averagePrice: {
-    fontSize: 14,
+  priceRange: {
+    fontSize: 15,
     fontWeight: "600",
     color: Colors.light.primary,
   },
-  category: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
+  onlineIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   mechanicFooter: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.lightGray,
   },
   mechanicStats: {
     flexDirection: "row",
@@ -478,12 +767,20 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   contactButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: Colors.light.primary,
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: Colors.light.primary,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   emptyState: {
     alignItems: "center",
@@ -501,5 +798,205 @@ const styles = StyleSheet.create({
     color: Colors.light.tabIconDefault,
     textAlign: "center",
     paddingHorizontal: 40,
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxHeight: "90%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 10,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalContentWeb: {
+    maxWidth: 500,
+    width: "90%",
+  },
+  modalContentMobile: {
+    maxWidth: width - 40,
+  },
+  modalHeader: {
+    marginBottom: 20,
+  },
+  modalTitleContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.light.primary,
+    flex: 1,
+  },
+  closeButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.light.background,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalOnlineIndicator: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: "flex-start",
+  },
+  onlineText: {
+    fontSize: 12,
+    color: "white",
+    fontWeight: "500",
+  },
+  modalMechanicInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.lightGray,
+  },
+  modalAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: Colors.light.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 16,
+  },
+  modalInfoText: {
+    flex: 1,
+  },
+  modalMechanicName: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  modalRating: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  modalRatingText: {
+    fontSize: 14,
+    color: Colors.light.tabIconDefault,
+    marginLeft: 6,
+  },
+  detailsGrid: {
+    marginBottom: 20,
+  },
+  detailItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: Colors.light.background,
+    borderRadius: 8,
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: Colors.light.tabIconDefault,
+    marginLeft: 8,
+    marginRight: 8,
+    minWidth: 80,
+    fontWeight: "500",
+  },
+  detailValue: {
+    fontSize: 14,
+    color: Colors.light.text,
+    flex: 1,
+    fontWeight: "500",
+  },
+  specialtiesContainer: {
+    marginBottom: 24,
+  },
+  specialtiesTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.light.text,
+    marginBottom: 12,
+  },
+  specialtiesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  specialtyChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: Colors.light.primary,
+    borderRadius: 16,
+  },
+  specialtyText: {
+    fontSize: 12,
+    color: "white",
+    fontWeight: "500",
+  },
+  modalActions: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  appointmentButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.light.primary,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: Colors.light.primary,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  appointmentButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
+    marginLeft: 8,
+  },
+  callButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.light.success,
+    paddingVertical: 14,
+    borderRadius: 12,
+    shadowColor: Colors.light.success,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  callButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
+    marginLeft: 8,
   },
 });

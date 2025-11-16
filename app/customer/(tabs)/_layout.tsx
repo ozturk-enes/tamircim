@@ -1,34 +1,36 @@
 import Colors from "@/constants/Colors";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function CustomerTabLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors.light.primary,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: Colors.light.background,
-          borderTopColor: Colors.light.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "500",
-        },
-        headerStyle: {
-          backgroundColor: Colors.light.primary,
-        },
-        headerTintColor: "white",
-        headerTitleStyle: {
-          fontWeight: "bold",
-        },
-      }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors.light.primary,
+          tabBarInactiveTintColor: Colors.light.tabIconDefault,
+          tabBarStyle: {
+            backgroundColor: Colors.light.background,
+            borderTopColor: Colors.light.border,
+            height: 60,
+            paddingBottom: 8,
+            paddingTop: 8,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: "500",
+          },
+          headerStyle: {
+            backgroundColor: Colors.light.primary,
+          },
+          headerTintColor: "white",
+          headerTitleStyle: {
+            fontWeight: "bold",
+          },
+        }}
+      >
       <Tabs.Screen
         name="map"
         options={{
@@ -47,7 +49,7 @@ export default function CustomerTabLayout() {
           headerTitle: "Tamircim - Müşteri",
           headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home" size={size} color={color} />
+            <FontAwesome name="wrench" size={size} color={color} />
           ),
         }}
       />
@@ -62,6 +64,7 @@ export default function CustomerTabLayout() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+    </SafeAreaView>
   );
 }

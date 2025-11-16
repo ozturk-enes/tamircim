@@ -6,6 +6,7 @@ export interface Customer {
   password: string;
   name: string;
   phone: string;
+  address?: string;
   avatar?: string;
   cars: Car[];
 }
@@ -77,6 +78,7 @@ export const mockCustomers: Customer[] = [
     password: '123456',
     name: 'Ahmet Yılmaz',
     phone: '+90 555 123 4567',
+    address: 'Kadıköy Mah. Bağdat Cad. No:123 Kadıköy/İstanbul',
     avatar: require('../assets/images/favicon.png'),
     cars: [
       {
@@ -105,6 +107,7 @@ export const mockCustomers: Customer[] = [
     password: '123456',
     name: 'Ali Kaya',
     phone: '+90 555 234 5678',
+    address: 'Çankaya Mah. Atatürk Bulvarı No:456 Çankaya/Ankara',
     avatar: require('../assets/images/favicon.png'),
     cars: [
       {

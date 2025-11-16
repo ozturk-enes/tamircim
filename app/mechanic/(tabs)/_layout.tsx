@@ -2,33 +2,35 @@ import Colors from "@/constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function MechanicTabLayout() {
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: Colors.light.secondary,
-        tabBarInactiveTintColor: Colors.light.tabIconDefault,
-        tabBarStyle: {
-          backgroundColor: Colors.light.background,
-          borderTopColor: Colors.light.border,
-          height: 60,
-          paddingBottom: 8,
-          paddingTop: 8,
-        },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: "500",
-        },
-        headerStyle: {
-          backgroundColor: Colors.light.secondary,
-        },
-        headerTintColor: "white",
-        headerTitleStyle: {
-          fontWeight: "bold",
-        },
-      }}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+      <Tabs
+        screenOptions={{
+          tabBarActiveTintColor: Colors.light.secondary,
+          tabBarInactiveTintColor: Colors.light.tabIconDefault,
+          tabBarStyle: {
+            backgroundColor: Colors.light.background,
+            borderTopColor: Colors.light.border,
+            height: 60,
+            paddingBottom: 8,
+            paddingTop: 8,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: "500",
+          },
+          headerStyle: {
+            backgroundColor: Colors.light.secondary,
+          },
+          headerTintColor: "white",
+          headerTitleStyle: {
+            fontWeight: "bold",
+          },
+        }}
+      >
       <Tabs.Screen
         name="map"
         options={{
@@ -62,6 +64,7 @@ export default function MechanicTabLayout() {
           ),
         }}
       />
-    </Tabs>
+      </Tabs>
+    </SafeAreaView>
   );
 }

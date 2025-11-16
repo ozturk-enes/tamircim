@@ -1,466 +1,705 @@
-import React, { useState } from 'react';
+import Colors from "@/constants/Colors";
+import { Ionicons } from "@expo/vector-icons";
+import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useState } from "react";
 import {
-  StyleSheet,
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
   Alert,
+  Image,
   Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
-  FlatList,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import Colors from '@/constants/Colors';
+  TouchableOpacity,
+  View,
+} from "react-native";
 
-// Mock comprehensive car data
+// Mock data - In a real app, this would come from a database
 const mockCarData = {
-  id: 1,
-  brand: 'Toyota',
-  model: 'Corolla',
-  year: 2020,
-  plate: '34 ABC 123',
-  color: 'Beyaz',
-  fuelType: 'Benzin',
-  mileage: 45000,
-  lastService: '2024-01-15',
-  nextService: '2024-07-15',
-  image: '🚗',
-  specifications: {
-    engine: '1.6L 4 Silindir',
-    power: '132 HP',
-    transmission: 'CVT Otomatik',
-    fuelCapacity: '50 L',
-    fuelConsumption: '6.2 L/100km',
-    maxSpeed: '180 km/h',
-    acceleration: '10.2 sn (0-100)',
-    weight: '1320 kg',
-    dimensions: '4630x1780x1435 mm',
-  },
-  repairHistory: [
-    {
-      id: 1,
-      date: '2024-01-15',
-      type: 'Periyodik Bakım',
-      mechanic: 'Mehmet Usta',
-      cost: 450,
-      description: 'Motor yağı değişimi, filtre değişimi, genel kontrol',
-      parts: ['Motor Yağı', 'Yağ Filtresi', 'Hava Filtresi'],
-      mileage: 45000,
-    },
-    {
-      id: 2,
-      date: '2023-10-20',
-      type: 'Fren Sistemi',
-      mechanic: 'Ali Tamirci',
-      cost: 320,
-      description: 'Ön fren balata değişimi',
-      parts: ['Fren Balata Takımı'],
-      mileage: 42000,
-    },
-    {
-      id: 3,
-      date: '2023-07-10',
-      type: 'Lastik Değişimi',
-      mechanic: 'Veli Oto',
-      cost: 800,
-      description: '4 adet lastik değişimi',
-      parts: ['Lastik x4'],
-      mileage: 40000,
-    },
-  ],
-  changedParts: [
-    {
-      id: 1,
-      name: 'Motor Yağı',
-      changeDate: '2024-01-15',
-      nextChange: '2024-07-15',
-      mileage: 45000,
-      nextMileage: 50000,
-      status: 'good',
-    },
-    {
-      id: 2,
-      name: 'Fren Balata',
-      changeDate: '2023-10-20',
-      nextChange: '2024-10-20',
-      mileage: 42000,
-      nextMileage: 60000,
-      status: 'good',
-    },
-    {
-      id: 3,
-      name: 'Lastik',
-      changeDate: '2023-07-10',
-      nextChange: '2025-07-10',
-      mileage: 40000,
-      nextMileage: 80000,
-      status: 'good',
-    },
-    {
-      id: 4,
-      name: 'Akü',
-      changeDate: '2022-05-15',
-      nextChange: '2025-05-15',
-      mileage: 35000,
-      nextMileage: 70000,
-      status: 'warning',
-    },
-  ],
-  reminders: [
-    {
-      id: 1,
-      title: 'Periyodik Bakım',
-      dueDate: '2024-07-15',
-      dueMileage: 50000,
-      type: 'service',
-      priority: 'medium',
-      description: 'Motor yağı ve filtre değişimi zamanı',
-    },
-    {
-      id: 2,
-      title: 'Muayene Yenileme',
-      dueDate: '2024-12-20',
-      dueMileage: null,
-      type: 'inspection',
-      priority: 'high',
-      description: 'Araç muayene tarihi yaklaşıyor',
-    },
-    {
-      id: 3,
-      title: 'Kasko Yenileme',
-      dueDate: '2024-08-10',
-      dueMileage: null,
-      type: 'insurance',
-      priority: 'high',
-      description: 'Kasko poliçesi yenileme zamanı',
-    },
-    {
-      id: 4,
-      title: 'Klima Gazı Kontrolü',
-      dueDate: '2024-06-01',
-      dueMileage: 48000,
-      type: 'maintenance',
-      priority: 'low',
-      description: 'Yaz öncesi klima sistemi kontrolü',
-    },
-  ],
-  messages: [
-    {
-      id: 1,
-      sender: 'Mehmet Usta',
-      message: 'Aracınızın periyodik bakım zamanı yaklaşıyor. Randevu almak için bize ulaşabilirsiniz.',
-      date: '2024-01-20',
-      type: 'reminder',
-    },
-    {
-      id: 2,
-      sender: 'Sistem',
-      message: 'Muayene tarihiniz 6 ay sonra sona eriyor. Unutmayın!',
-      date: '2024-01-18',
-      type: 'system',
-    },
-    {
-      id: 3,
-      sender: 'Ali Tamirci',
-      message: 'Fren balata değişimi başarıyla tamamlandı. İyi yolculuklar!',
-      date: '2023-10-20',
-      type: 'service',
-    },
-  ],
+  id: "1",
+  brand: "Toyota",
+  model: "Corolla",
+  year: "2020",
+  plate: "34 ABC 123",
+  color: "Beyaz",
+  fuelType: "Benzin",
+  transmission: "Manuel",
+  mileage: "45000",
+  engineSize: "1.6",
+  chassisNumber: "JT2BF22K9X0123456",
+  notes: "Düzenli bakımı yapılmış, temiz araç",
+  inspectionDate: "2024-06-15",
+  insuranceDate: "2024-12-30",
 };
 
+const mockRepairs = [
+  {
+    id: "1",
+    title: "Fren Balata Değişimi",
+    status: "completed",
+    date: "2024-01-15",
+    cost: "850 TL",
+    description: "Ön fren balatalar değiştirildi",
+    parts: ["Fren Balata (Ön)", "İş Gücü"],
+  },
+  {
+    id: "2",
+    title: "Motor Yağı Değişimi",
+    status: "in_progress",
+    date: "2024-01-20",
+    cost: "320 TL",
+    description: "Periyodik motor yağı ve filtre değişimi",
+    parts: ["Motor Yağı 5W-30", "Yağ Filtresi"],
+  },
+  {
+    id: "3",
+    title: "Klima Gazı Dolumu",
+    status: "pending",
+    date: "2024-01-25",
+    cost: "200 TL",
+    description: "Klima sistemi gaz dolumu",
+    parts: ["R134a Gaz"],
+  },
+];
+
+const mockParts = [
+  {
+    id: "1",
+    name: "Fren Balata (Ön)",
+    changeDate: "2024-01-15",
+    nextChangeKm: "55000",
+    status: "good",
+  },
+  {
+    id: "2",
+    name: "Motor Yağı",
+    changeDate: "2024-01-20",
+    nextChangeKm: "50000",
+    status: "warning",
+  },
+  {
+    id: "3",
+    name: "Lastik (4 Adet)",
+    changeDate: "2023-08-10",
+    nextChangeKm: "65000",
+    status: "critical",
+  },
+];
+
+const mockMessages = [
+  {
+    id: "1",
+    sender: "mechanic",
+    message:
+      "Aracınızın fren balataları değiştirildi. Kontrol için 1000 km sonra gelebilirsiniz.",
+    time: "14:30",
+    date: "2024-01-15",
+  },
+  {
+    id: "2",
+    sender: "customer",
+    message: "Teşekkürler, frenler çok daha iyi çalışıyor şimdi.",
+    time: "16:45",
+    date: "2024-01-15",
+  },
+  {
+    id: "3",
+    sender: "mechanic",
+    message:
+      "Motor yağı değişimi için randevu alabilirsiniz. Yaklaşık 5000 km olmuş.",
+    time: "10:15",
+    date: "2024-01-18",
+  },
+];
+
 export default function CarDetailsScreen() {
-  const { carId } = useLocalSearchParams();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showMessageModal, setShowMessageModal] = useState(false);
-  const [newMessage, setNewMessage] = useState('');
+  const params = useLocalSearchParams();
+  const [activeTab, setActiveTab] = useState("info");
+  const [newMessage, setNewMessage] = useState("");
+  const [showAlarmModal, setShowAlarmModal] = useState(false);
+  const [alarmType, setAlarmType] = useState("");
+  const [alarmDate, setAlarmDate] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedCarData, setEditedCarData] = useState(mockCarData);
+  const [carImage, setCarImage] = useState<string | null>(null);
+  const [showAttachmentOptions, setShowAttachmentOptions] = useState(false);
 
-  // In a real app, you would fetch car data based on carId
-  const carData = mockCarData;
-
-  const tabs = [
-    { id: 'overview', title: 'Genel', icon: 'car' },
-    { id: 'specs', title: 'Özellikler', icon: 'settings' },
-    { id: 'history', title: 'Geçmiş', icon: 'time' },
-    { id: 'parts', title: 'Parçalar', icon: 'construct' },
-    { id: 'reminders', title: 'Hatırlatıcılar', icon: 'notifications' },
-    { id: 'messages', title: 'Mesajlar', icon: 'chatbubbles' },
-  ];
+  const handleBack = () => {
+    router.back();
+  };
 
   const handleSendMessage = () => {
-    if (!newMessage.trim()) {
-      Alert.alert('Hata', 'Lütfen bir mesaj yazın.');
+    if (newMessage.trim()) {
+      // In a real app, this would send the message to the backend
+      Alert.alert("Mesaj Gönderildi", "Mesajınız tamirciye iletildi.");
+      setNewMessage("");
+    }
+  };
+
+  const handleAttachFile = () => {
+    setShowAttachmentOptions(true);
+  };
+
+  const attachPhoto = async () => {
+    setShowAttachmentOptions(false);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      Alert.alert("Fotoğraf Eklendi", "Fotoğraf mesajınıza eklendi.");
+    }
+  };
+
+  const attachDocument = () => {
+    setShowAttachmentOptions(false);
+    Alert.alert("Belge Ekle", "Belge ekleme özelliği yakında eklenecek.");
+  };
+
+  const handleSetAlarm = () => {
+    if (alarmType && alarmDate) {
+      Alert.alert(
+        "Alarm Oluşturuldu",
+        `${alarmType} için ${alarmDate} tarihinde hatırlatma oluşturuldu.`
+      );
+      setShowAlarmModal(false);
+      setAlarmType("");
+      setAlarmDate("");
+    } else {
+      Alert.alert("Hata", "Lütfen alarm türü ve tarih seçin.");
+    }
+  };
+
+  const handleEdit = () => {
+    setIsEditing(true);
+  };
+
+  const handleSaveEdit = () => {
+    Alert.alert(
+      "Değişiklikleri Kaydet",
+      "Araç bilgilerini güncellemek istediğinizden emin misiniz?",
+      [
+        {
+          text: "İptal",
+          style: "cancel",
+        },
+        {
+          text: "Kaydet",
+          onPress: () => {
+            // In a real app, this would update the backend
+            Alert.alert("Başarılı", "Araç bilgileri güncellendi.");
+            setIsEditing(false);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleCancelEdit = () => {
+    setEditedCarData(mockCarData);
+    setIsEditing(false);
+  };
+
+  const updateCarData = (field: string, value: string) => {
+    setEditedCarData((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "İzin Gerekli",
+        "Fotoğraf seçmek için galeri erişim izni gereklidir."
+      );
       return;
     }
 
-    // In a real app, you would send the message to the backend
-    Alert.alert('Başarılı', 'Mesajınız gönderildi!');
-    setNewMessage('');
-    setShowMessageModal(false);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setCarImage(result.assets[0].uri);
+    }
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "İzin Gerekli",
+        "Fotoğraf çekmek için kamera erişim izni gereklidir."
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+
+    if (!result.canceled) {
+      setCarImage(result.assets[0].uri);
+    }
+  };
+
+  const showImagePicker = () => {
+    Alert.alert(
+      "Fotoğraf Seç",
+      "Araç fotoğrafını nasıl eklemek istiyorsunuz?",
+      [
+        {
+          text: "İptal",
+          style: "cancel",
+        },
+        {
+          text: "Galeriden Seç",
+          onPress: pickImage,
+        },
+        {
+          text: "Fotoğraf Çek",
+          onPress: takePhoto,
+        },
+      ]
+    );
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'good': return Colors.light.success;
-      case 'warning': return Colors.light.warning;
-      case 'critical': return Colors.light.error;
-      default: return Colors.light.tabIconDefault;
+      case "good":
+        return Colors.light.success;
+      case "warning":
+        return Colors.light.warning;
+      case "critical":
+        return Colors.light.error;
+      case "completed":
+        return Colors.light.success;
+      case "in_progress":
+        return Colors.light.warning;
+      case "pending":
+        return Colors.light.tabIconDefault;
+      default:
+        return Colors.light.tabIconDefault;
     }
   };
 
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return Colors.light.error;
-      case 'medium': return Colors.light.warning;
-      case 'low': return Colors.light.success;
-      default: return Colors.light.tabIconDefault;
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case "good":
+        return "İyi Durumda";
+      case "warning":
+        return "Dikkat";
+      case "critical":
+        return "Acil";
+      case "completed":
+        return "Tamamlandı";
+      case "in_progress":
+        return "Devam Ediyor";
+      case "pending":
+        return "Bekliyor";
+      default:
+        return status;
     }
   };
 
-  const renderOverview = () => (
+  const renderInfoTab = () => (
     <View style={styles.tabContent}>
-      {/* Car Info Card */}
-      <View style={styles.card}>
-        <View style={styles.carHeader}>
-          <Text style={styles.carEmoji}>{carData.image}</Text>
-          <View style={styles.carInfo}>
-            <Text style={styles.carTitle}>{carData.brand} {carData.model}</Text>
-            <Text style={styles.carSubtitle}>{carData.year} • {carData.plate}</Text>
-            <Text style={styles.carDetails}>{carData.color} • {carData.fuelType}</Text>
-          </View>
-        </View>
-        
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons name="speedometer" size={20} color={Colors.light.primary} />
-            <Text style={styles.statLabel}>Kilometre</Text>
-            <Text style={styles.statValue}>{carData.mileage.toLocaleString()} km</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="calendar" size={20} color={Colors.light.primary} />
-            <Text style={styles.statLabel}>Son Servis</Text>
-            <Text style={styles.statValue}>{carData.lastService}</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Ionicons name="time" size={20} color={Colors.light.primary} />
-            <Text style={styles.statLabel}>Sonraki Servis</Text>
-            <Text style={styles.statValue}>{carData.nextService}</Text>
-          </View>
-        </View>
-      </View>
-
-      {/* Quick Actions */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Hızlı İşlemler</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickAction}>
-            <Ionicons name="construct" size={24} color={Colors.light.primary} />
-            <Text style={styles.quickActionText}>Servis Randevusu</Text>
+      {/* Car Image */}
+      <View style={styles.carImageContainer}>
+        <TouchableOpacity
+          style={styles.carImagePlaceholder}
+          onPress={showImagePicker}
+          activeOpacity={0.7}
+        >
+          {carImage ? (
+            <Image source={{ uri: carImage }} style={styles.carImage} />
+          ) : (
+            <>
+              <Ionicons
+                name="camera"
+                size={60}
+                color={Colors.light.tabIconDefault}
+              />
+              <Text style={styles.carImageText}>Araç Fotoğrafı Ekle</Text>
+              <Text style={styles.carImageSubtext}>
+                Dokunarak fotoğraf ekleyin
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+        {carImage && (
+          <TouchableOpacity
+            style={styles.changeImageButton}
+            onPress={showImagePicker}
+          >
+            <Ionicons name="camera" size={16} color={Colors.light.primary} />
+            <Text style={styles.changeImageText}>Fotoğrafı Değiştir</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction}>
-            <Ionicons name="car" size={24} color={Colors.light.primary} />
-            <Text style={styles.quickActionText}>Tamirci Bul</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickAction}>
-            <Ionicons name="document-text" size={24} color={Colors.light.primary} />
-            <Text style={styles.quickActionText}>Rapor Al</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Recent Activity */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Son Aktiviteler</Text>
-        {carData.repairHistory.slice(0, 3).map((repair) => (
-          <View key={repair.id} style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <Ionicons name="construct" size={16} color="white" />
-            </View>
-            <View style={styles.activityInfo}>
-              <Text style={styles.activityTitle}>{repair.type}</Text>
-              <Text style={styles.activityDate}>{repair.date} • {repair.mechanic}</Text>
-            </View>
-            <Text style={styles.activityCost}>₺{repair.cost}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderSpecs = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Teknik Özellikler</Text>
-        {Object.entries(carData.specifications).map(([key, value]) => (
-          <View key={key} style={styles.specRow}>
-            <Text style={styles.specLabel}>
-              {key === 'engine' ? 'Motor' :
-               key === 'power' ? 'Güç' :
-               key === 'transmission' ? 'Şanzıman' :
-               key === 'fuelCapacity' ? 'Yakıt Kapasitesi' :
-               key === 'fuelConsumption' ? 'Yakıt Tüketimi' :
-               key === 'maxSpeed' ? 'Maksimum Hız' :
-               key === 'acceleration' ? '0-100 km/h' :
-               key === 'weight' ? 'Ağırlık' :
-               key === 'dimensions' ? 'Boyutlar' : key}
-            </Text>
-            <Text style={styles.specValue}>{value}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderHistory = () => (
-    <View style={styles.tabContent}>
-      <FlatList
-        data={carData.repairHistory}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.historyHeader}>
-              <View>
-                <Text style={styles.historyTitle}>{item.type}</Text>
-                <Text style={styles.historyDate}>{item.date} • {item.mileage.toLocaleString()} km</Text>
-              </View>
-              <Text style={styles.historyCost}>₺{item.cost}</Text>
-            </View>
-            <Text style={styles.historyMechanic}>Tamirci: {item.mechanic}</Text>
-            <Text style={styles.historyDescription}>{item.description}</Text>
-            <View style={styles.historyParts}>
-              <Text style={styles.historyPartsTitle}>Değişen Parçalar:</Text>
-              {item.parts.map((part, index) => (
-                <Text key={index} style={styles.historyPart}>• {part}</Text>
-              ))}
-            </View>
-          </View>
         )}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
+      </View>
 
-  const renderParts = () => (
-    <View style={styles.tabContent}>
-      <FlatList
-        data={carData.changedParts}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.partHeader}>
-              <View style={styles.partInfo}>
-                <Text style={styles.partName}>{item.name}</Text>
-                <Text style={styles.partDate}>Son Değişim: {item.changeDate}</Text>
-              </View>
-              <View style={[styles.partStatus, { backgroundColor: getStatusColor(item.status) }]}>
-                <Ionicons 
-                  name={item.status === 'good' ? 'checkmark' : item.status === 'warning' ? 'warning' : 'close'} 
-                  size={16} 
-                  color="white" 
+      {/* Basic Info */}
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Temel Bilgiler</Text>
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Marka</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.brand}
+                onChangeText={(value) => updateCarData("brand", value)}
+                placeholder="Marka"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.brand}</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Model</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.model}
+                onChangeText={(value) => updateCarData("model", value)}
+                placeholder="Model"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.model}</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Yıl</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.year}
+                onChangeText={(value) => updateCarData("year", value)}
+                placeholder="Yıl"
+                keyboardType="numeric"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.year}</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Plaka</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.plate}
+                onChangeText={(value) => updateCarData("plate", value)}
+                placeholder="Plaka"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.plate}</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Renk</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.color}
+                onChangeText={(value) => updateCarData("color", value)}
+                placeholder="Renk"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.color}</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Yakıt</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.fuelType}
+                onChangeText={(value) => updateCarData("fuelType", value)}
+                placeholder="Yakıt Türü"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.fuelType}</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Vites</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.transmission}
+                onChangeText={(value) => updateCarData("transmission", value)}
+                placeholder="Vites Türü"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.transmission}</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Kilometre</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.mileage}
+                onChangeText={(value) => updateCarData("mileage", value)}
+                placeholder="Kilometre"
+                keyboardType="numeric"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.mileage} km</Text>
+            )}
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Motor</Text>
+            {isEditing ? (
+              <TextInput
+                style={styles.editInput}
+                value={editedCarData.engineSize}
+                onChangeText={(value) => updateCarData("engineSize", value)}
+                placeholder="Motor Hacmi"
+                keyboardType="numeric"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{editedCarData.engineSize}L</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Important Dates */}
+      <View style={styles.infoSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Önemli Tarihler</Text>
+          <TouchableOpacity
+            style={styles.alarmButton}
+            onPress={() => setShowAlarmModal(true)}
+          >
+            <Ionicons name="alarm" size={20} color={Colors.light.primary} />
+            <Text style={styles.alarmButtonText}>Alarm Ekle</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.dateCard}>
+          <View style={styles.dateItem}>
+            <Ionicons
+              name="document-text"
+              size={24}
+              color={Colors.light.primary}
+            />
+            <View style={styles.dateInfo}>
+              <Text style={styles.dateLabel}>Muayene Tarihi</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.editInput}
+                  value={editedCarData.inspectionDate}
+                  onChangeText={(value) =>
+                    updateCarData("inspectionDate", value)
+                  }
+                  placeholder="GG.AA.YYYY"
                 />
-              </View>
-            </View>
-            <View style={styles.partDetails}>
-              <View style={styles.partDetail}>
-                <Text style={styles.partDetailLabel}>Sonraki Değişim</Text>
-                <Text style={styles.partDetailValue}>{item.nextChange}</Text>
-              </View>
-              <View style={styles.partDetail}>
-                <Text style={styles.partDetailLabel}>Kilometre</Text>
-                <Text style={styles.partDetailValue}>{item.mileage.toLocaleString()} / {item.nextMileage.toLocaleString()} km</Text>
-              </View>
-            </View>
-          </View>
-        )}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
-
-  const renderReminders = () => (
-    <View style={styles.tabContent}>
-      <FlatList
-        data={carData.reminders}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.reminderHeader}>
-              <View style={styles.reminderInfo}>
-                <Text style={styles.reminderTitle}>{item.title}</Text>
-                <Text style={styles.reminderDate}>Tarih: {item.dueDate}</Text>
-                {item.dueMileage && (
-                  <Text style={styles.reminderMileage}>Kilometre: {item.dueMileage.toLocaleString()} km</Text>
-                )}
-              </View>
-              <View style={[styles.reminderPriority, { backgroundColor: getPriorityColor(item.priority) }]}>
-                <Text style={styles.reminderPriorityText}>
-                  {item.priority === 'high' ? 'Yüksek' : 
-                   item.priority === 'medium' ? 'Orta' : 'Düşük'}
+              ) : (
+                <Text style={styles.dateValue}>
+                  {editedCarData.inspectionDate}
                 </Text>
-              </View>
+              )}
             </View>
-            <Text style={styles.reminderDescription}>{item.description}</Text>
           </View>
-        )}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
-  );
-
-  const renderMessages = () => (
-    <View style={styles.tabContent}>
-      <TouchableOpacity 
-        style={styles.newMessageButton}
-        onPress={() => setShowMessageModal(true)}
-      >
-        <Ionicons name="add" size={20} color="white" />
-        <Text style={styles.newMessageText}>Yeni Mesaj</Text>
-      </TouchableOpacity>
-
-      <FlatList
-        data={carData.messages}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.messageHeader}>
-              <View style={styles.messageInfo}>
-                <Text style={styles.messageSender}>{item.sender}</Text>
-                <Text style={styles.messageDate}>{item.date}</Text>
-              </View>
-              <View style={[styles.messageType, { 
-                backgroundColor: item.type === 'system' ? Colors.light.primary : 
-                                item.type === 'reminder' ? Colors.light.warning : Colors.light.success 
-              }]}>
-                <Ionicons 
-                  name={item.type === 'system' ? 'information' : 
-                       item.type === 'reminder' ? 'time' : 'construct'} 
-                  size={16} 
-                  color="white" 
+          <View style={styles.dateItem}>
+            <Ionicons
+              name="shield-checkmark"
+              size={24}
+              color={Colors.light.success}
+            />
+            <View style={styles.dateInfo}>
+              <Text style={styles.dateLabel}>Sigorta Tarihi</Text>
+              {isEditing ? (
+                <TextInput
+                  style={styles.editInput}
+                  value={editedCarData.insuranceDate}
+                  onChangeText={(value) =>
+                    updateCarData("insuranceDate", value)
+                  }
+                  placeholder="GG.AA.YYYY"
                 />
-              </View>
+              ) : (
+                <Text style={styles.dateValue}>
+                  {editedCarData.insuranceDate}
+                </Text>
+              )}
             </View>
-            <Text style={styles.messageText}>{item.message}</Text>
           </View>
+        </View>
+      </View>
+
+      {/* Notes */}
+      <View style={styles.infoSection}>
+        <Text style={styles.sectionTitle}>Notlar</Text>
+        {isEditing ? (
+          <TextInput
+            style={[styles.editInput, styles.notesInput]}
+            value={editedCarData.notes}
+            onChangeText={(value) => updateCarData("notes", value)}
+            placeholder="Araç hakkında notlar..."
+            multiline
+            numberOfLines={4}
+          />
+        ) : (
+          <Text style={styles.notesText}>
+            {editedCarData.notes || "Not bulunmuyor"}
+          </Text>
         )}
-        showsVerticalScrollIndicator={false}
-      />
+      </View>
     </View>
   );
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'overview': return renderOverview();
-      case 'specs': return renderSpecs();
-      case 'history': return renderHistory();
-      case 'parts': return renderParts();
-      case 'reminders': return renderReminders();
-      case 'messages': return renderMessages();
-      default: return renderOverview();
-    }
-  };
+  const renderPartsTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.sectionTitle}>Değişen Parçalar</Text>
+      {mockParts.map((part) => (
+        <View key={part.id} style={styles.partCard}>
+          <View style={styles.partHeader}>
+            <Text style={styles.partName}>{part.name}</Text>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: getStatusColor(part.status) },
+              ]}
+            >
+              <Text style={styles.statusText}>
+                {getStatusText(part.status)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.partDetails}>
+            <View style={styles.partDetailItem}>
+              <Ionicons
+                name="calendar"
+                size={16}
+                color={Colors.light.tabIconDefault}
+              />
+              <Text style={styles.partDetailText}>
+                Değişim: {part.changeDate}
+              </Text>
+            </View>
+            <View style={styles.partDetailItem}>
+              <Ionicons
+                name="speedometer"
+                size={16}
+                color={Colors.light.tabIconDefault}
+              />
+              <Text style={styles.partDetailText}>
+                Sonraki: {part.nextChangeKm} km
+              </Text>
+            </View>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderRepairsTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.sectionTitle}>Tamirler</Text>
+      {mockRepairs.map((repair) => (
+        <View key={repair.id} style={styles.repairCard}>
+          <View style={styles.repairHeader}>
+            <Text style={styles.repairTitle}>{repair.title}</Text>
+            <View
+              style={[
+                styles.statusBadge,
+                { backgroundColor: getStatusColor(repair.status) },
+              ]}
+            >
+              <Text style={styles.statusText}>
+                {getStatusText(repair.status)}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.repairDescription}>{repair.description}</Text>
+          <View style={styles.repairDetails}>
+            <View style={styles.repairDetailItem}>
+              <Ionicons
+                name="calendar"
+                size={16}
+                color={Colors.light.tabIconDefault}
+              />
+              <Text style={styles.repairDetailText}>{repair.date}</Text>
+            </View>
+            <View style={styles.repairDetailItem}>
+              <Ionicons
+                name="cash"
+                size={16}
+                color={Colors.light.tabIconDefault}
+              />
+              <Text style={styles.repairDetailText}>{repair.cost}</Text>
+            </View>
+          </View>
+          <View style={styles.partsUsed}>
+            <Text style={styles.partsTitle}>Kullanılan Parçalar:</Text>
+            {repair.parts.map((part, index) => (
+              <Text key={index} style={styles.partItem}>
+                • {part}
+              </Text>
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderMessagesTab = () => (
+    <View style={styles.tabContent}>
+      <Text style={styles.sectionTitle}>Tamirci ile Mesajlaşma</Text>
+      <ScrollView
+        style={styles.messagesContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        {mockMessages.map((message) => (
+          <View
+            key={message.id}
+            style={[
+              styles.messageCard,
+              message.sender === "customer"
+                ? styles.customerMessage
+                : styles.mechanicMessage,
+            ]}
+          >
+            <Text style={styles.messageText}>{message.message}</Text>
+            <Text style={styles.messageTime}>
+              {message.time} - {message.date}
+            </Text>
+          </View>
+        ))}
+      </ScrollView>
+      <View style={styles.messageInputContainer}>
+        <TouchableOpacity
+          style={styles.attachButton}
+          onPress={handleAttachFile}
+        >
+          <Ionicons name="add" size={24} color={Colors.light.primary} />
+        </TouchableOpacity>
+        <TextInput
+          style={styles.messageTextInput}
+          placeholder="Mesaj yazın..."
+          value={newMessage}
+          onChangeText={setNewMessage}
+          multiline
+        />
+        <TouchableOpacity style={styles.sendButton} onPress={handleSendMessage}>
+          <Ionicons name="send" size={20} color="white" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
@@ -470,79 +709,277 @@ export default function CarDetailsScreen() {
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="white" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Araç Detayları</Text>
-          <View style={styles.placeholder} />
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerTitle}>
+              {mockCarData.brand} {mockCarData.model}
+            </Text>
+            <Text style={styles.headerSubtitle}>{mockCarData.plate}</Text>
+          </View>
+          {isEditing ? (
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancelEdit}
+              >
+                <Ionicons name="close" size={20} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveEdit}
+              >
+                <Ionicons name="checkmark" size={20} color="white" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.editButton} onPress={handleEdit}>
+              <Ionicons name="create" size={24} color="white" />
+            </TouchableOpacity>
+          )}
         </View>
       </LinearGradient>
 
       {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabScrollContent}
+      <View style={styles.tabNavigation}>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "info" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("info")}
         >
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Ionicons 
-                name={tab.icon as any} 
-                size={16} 
-                color={activeTab === tab.id ? Colors.light.primary : Colors.light.tabIconDefault} 
-              />
-              <Text style={[
-                styles.tabText,
-                activeTab === tab.id && styles.activeTabText
-              ]}>
-                {tab.title}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          <Ionicons
+            name="information-circle"
+            size={20}
+            color={
+              activeTab === "info"
+                ? Colors.light.primary
+                : Colors.light.tabIconDefault
+            }
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === "info" && styles.activeTabButtonText,
+            ]}
+          >
+            Bilgiler
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "parts" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("parts")}
+        >
+          <Ionicons
+            name="construct"
+            size={20}
+            color={
+              activeTab === "parts"
+                ? Colors.light.primary
+                : Colors.light.tabIconDefault
+            }
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === "parts" && styles.activeTabButtonText,
+            ]}
+          >
+            Parçalar
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "repairs" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("repairs")}
+        >
+          <Ionicons
+            name="build"
+            size={20}
+            color={
+              activeTab === "repairs"
+                ? Colors.light.primary
+                : Colors.light.tabIconDefault
+            }
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === "repairs" && styles.activeTabButtonText,
+            ]}
+          >
+            Tamirler
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.tabButton,
+            activeTab === "messages" && styles.activeTabButton,
+          ]}
+          onPress={() => setActiveTab("messages")}
+        >
+          <Ionicons
+            name="chatbubbles"
+            size={20}
+            color={
+              activeTab === "messages"
+                ? Colors.light.primary
+                : Colors.light.tabIconDefault
+            }
+          />
+          <Text
+            style={[
+              styles.tabButtonText,
+              activeTab === "messages" && styles.activeTabButtonText,
+            ]}
+          >
+            Mesajlar
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Tab Content */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {renderTabContent()}
+        {activeTab === "info" && renderInfoTab()}
+        {activeTab === "parts" && renderPartsTab()}
+        {activeTab === "repairs" && renderRepairsTab()}
+        {activeTab === "messages" && renderMessagesTab()}
       </ScrollView>
 
-      {/* New Message Modal */}
+      {/* Bottom Quick Actions */}
+      <View style={styles.bottomActions}>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={() => setActiveTab("messages")}
+        >
+          <Ionicons name="chatbubbles" size={24} color={Colors.light.primary} />
+          <Text style={styles.quickActionText}>Mesajlar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={() => setActiveTab("repairs")}
+        >
+          <Ionicons name="build" size={24} color={Colors.light.primary} />
+          <Text style={styles.quickActionText}>Son İşlemler</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={() => setShowAlarmModal(true)}
+        >
+          <Ionicons name="alarm" size={24} color={Colors.light.primary} />
+          <Text style={styles.quickActionText}>Alarm</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.quickActionButton}
+          onPress={() => setActiveTab("parts")}
+        >
+          <Ionicons name="construct" size={24} color={Colors.light.primary} />
+          <Text style={styles.quickActionText}>Parçalar</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Alarm Modal */}
       <Modal
-        visible={showMessageModal}
+        visible={showAlarmModal}
         animationType="slide"
         presentationStyle="pageSheet"
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowMessageModal(false)}>
+            <TouchableOpacity onPress={() => setShowAlarmModal(false)}>
               <Ionicons name="close" size={24} color={Colors.light.text} />
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Yeni Mesaj</Text>
-            <TouchableOpacity onPress={handleSendMessage}>
-              <Text style={styles.sendButton}>Gönder</Text>
+            <Text style={styles.modalTitle}>Alarm Ekle</Text>
+            <TouchableOpacity onPress={handleSetAlarm}>
+              <Text style={styles.modalSaveText}>Kaydet</Text>
             </TouchableOpacity>
           </View>
-
           <View style={styles.modalContent}>
-            <Text style={styles.inputLabel}>Mesajınız</Text>
-            <TextInput
-              style={styles.messageInput}
-              value={newMessage}
-              onChangeText={setNewMessage}
-              placeholder="Tamirci ile ilgili sorularınızı yazabilirsiniz..."
-              multiline
-              numberOfLines={6}
-              textAlignVertical="top"
-            />
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Alarm Türü</Text>
+              <View style={styles.alarmTypes}>
+                {["Muayene", "Sigorta", "Periyodik Bakım", "Özel"].map(
+                  (type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.alarmTypeButton,
+                        alarmType === type && styles.alarmTypeButtonActive,
+                      ]}
+                      onPress={() => setAlarmType(type)}
+                    >
+                      <Text
+                        style={[
+                          styles.alarmTypeText,
+                          alarmType === type && styles.alarmTypeTextActive,
+                        ]}
+                      >
+                        {type}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                )}
+              </View>
+            </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Tarih</Text>
+              <TextInput
+                style={styles.input}
+                value={alarmDate}
+                onChangeText={setAlarmDate}
+                placeholder="GG.AA.YYYY"
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Attachment Options Modal */}
+      <Modal
+        visible={showAttachmentOptions}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        transparent={true}
+      >
+        <View style={styles.attachmentModalOverlay}>
+          <View style={styles.attachmentModal}>
+            <View style={styles.attachmentHeader}>
+              <Text style={styles.attachmentTitle}>Dosya Ekle</Text>
+              <TouchableOpacity onPress={() => setShowAttachmentOptions(false)}>
+                <Ionicons name="close" size={24} color={Colors.light.text} />
+              </TouchableOpacity>
+            </View>
+            <View style={styles.attachmentOptions}>
+              <TouchableOpacity
+                style={styles.attachmentOption}
+                onPress={attachPhoto}
+              >
+                <Ionicons
+                  name="camera"
+                  size={32}
+                  color={Colors.light.primary}
+                />
+                <Text style={styles.attachmentOptionText}>Fotoğraf</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.attachmentOption}
+                onPress={attachDocument}
+              >
+                <Ionicons
+                  name="document"
+                  size={32}
+                  color={Colors.light.primary}
+                />
+                <Text style={styles.attachmentOptionText}>Belge</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -561,403 +998,540 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerInfo: {
+    flex: 1,
+    alignItems: "center",
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
+    fontWeight: "bold",
+    color: "white",
   },
-  placeholder: {
+  headerSubtitle: {
+    fontSize: 16,
+    color: "rgba(255, 255, 255, 0.8)",
+    marginTop: 4,
+  },
+  editButton: {
     width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  tabContainer: {
-    backgroundColor: 'white',
+  editActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  cancelButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  saveButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  editInput: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.text,
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "white",
+    marginTop: 4,
+  },
+  notesInput: {
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  tabNavigation: {
+    flexDirection: "row",
+    backgroundColor: "white",
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.border,
   },
-  tabScrollContent: {
-    paddingHorizontal: 20,
-  },
-  tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
+  tabButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 12,
-    marginRight: 8,
-    borderRadius: 20,
-    gap: 6,
+    gap: 4,
   },
-  activeTab: {
-    backgroundColor: Colors.light.lightBlue,
+  activeTabButton: {
+    borderBottomWidth: 2,
+    borderBottomColor: Colors.light.primary,
   },
-  tabText: {
-    fontSize: 14,
+  tabButtonText: {
+    fontSize: 12,
     color: Colors.light.tabIconDefault,
-    fontWeight: '500',
+    fontWeight: "500",
   },
-  activeTabText: {
+  activeTabButtonText: {
     color: Colors.light.primary,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   content: {
     flex: 1,
+    marginBottom: 80, // Space for bottom actions
+  },
+  bottomActions: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    backgroundColor: "white",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.border,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: -2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  quickActionButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    gap: 4,
+  },
+  quickActionText: {
+    fontSize: 11,
+    color: Colors.light.primary,
+    fontWeight: "600",
   },
   tabContent: {
     padding: 20,
   },
-  card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-    marginBottom: 16,
-  },
-  carHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  carImageContainer: {
+    alignItems: "center",
     marginBottom: 20,
   },
-  carEmoji: {
-    fontSize: 48,
-    marginRight: 16,
+  carImagePlaceholder: {
+    width: 200,
+    height: 120,
+    backgroundColor: Colors.light.background,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: Colors.light.border,
+    borderStyle: "dashed",
   },
-  carInfo: {
-    flex: 1,
-  },
-  carTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-    marginBottom: 4,
-  },
-  carSubtitle: {
-    fontSize: 16,
-    color: Colors.light.tabIconDefault,
-    marginBottom: 2,
-  },
-  carDetails: {
+  carImageText: {
     fontSize: 14,
     color: Colors.light.tabIconDefault,
+    marginTop: 8,
+    fontWeight: "600",
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statLabel: {
+  carImageSubtext: {
     fontSize: 12,
     color: Colors.light.tabIconDefault,
     marginTop: 4,
-    marginBottom: 2,
+    opacity: 0.7,
   },
-  statValue: {
+  carImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 12,
+  },
+  changeImageButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: Colors.light.lightBlue,
+    borderRadius: 20,
+    gap: 6,
+  },
+  changeImageText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickAction: {
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: 16,
-  },
-  quickActionText: {
-    fontSize: 12,
-    color: Colors.light.text,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  activityItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  activityIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.light.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  activityInfo: {
-    flex: 1,
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  activityDate: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-  },
-  activityCost: {
-    fontSize: 14,
-    fontWeight: '600',
     color: Colors.light.primary,
+    fontWeight: "600",
   },
-  specRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+  infoSection: {
+    marginBottom: 24,
   },
-  specLabel: {
-    fontSize: 14,
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
     color: Colors.light.text,
-    flex: 1,
+    marginBottom: 16,
   },
-  specValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-    flex: 1,
-    textAlign: 'right',
+  infoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
   },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+  infoItem: {
+    width: "47%",
+    backgroundColor: "white",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
-  historyTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-  },
-  historyDate: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-  },
-  historyCost: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.light.primary,
-  },
-  historyMechanic: {
+  infoLabel: {
     fontSize: 14,
     color: Colors.light.tabIconDefault,
-    marginBottom: 8,
-  },
-  historyDescription: {
-    fontSize: 14,
-    color: Colors.light.text,
-    marginBottom: 12,
-  },
-  historyParts: {
-    backgroundColor: Colors.light.background,
-    padding: 12,
-    borderRadius: 8,
-  },
-  historyPartsTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: Colors.light.text,
     marginBottom: 4,
   },
-  historyPart: {
-    fontSize: 12,
+  infoValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.text,
+  },
+  alarmButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.light.lightBlue,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 4,
+  },
+  alarmButtonText: {
+    fontSize: 14,
+    color: Colors.light.primary,
+    fontWeight: "600",
+  },
+  dateCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    gap: 16,
+  },
+  dateItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  dateInfo: {
+    flex: 1,
+  },
+  dateLabel: {
+    fontSize: 14,
     color: Colors.light.tabIconDefault,
-    marginLeft: 8,
+  },
+  dateValue: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.text,
+    marginTop: 2,
+  },
+  notesText: {
+    fontSize: 16,
+    color: Colors.light.text,
+    backgroundColor: "white",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    lineHeight: 24,
+  },
+  partCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   partHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 12,
-  },
-  partInfo: {
-    flex: 1,
   },
   partName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "600",
     color: Colors.light.text,
-  },
-  partDate: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-  },
-  partStatus: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  partDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  partDetail: {
     flex: 1,
   },
-  partDetailLabel: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-    marginBottom: 2,
-  },
-  partDetailValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  reminderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  reminderInfo: {
-    flex: 1,
-  },
-  reminderTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.light.text,
-    marginBottom: 4,
-  },
-  reminderDate: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-  },
-  reminderMileage: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-  },
-  reminderPriority: {
+  statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
-  reminderPriorityText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'white',
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "white",
   },
-  reminderDescription: {
-    fontSize: 14,
-    color: Colors.light.text,
-  },
-  newMessageButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: Colors.light.primary,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginBottom: 16,
+  partDetails: {
     gap: 8,
   },
-  newMessageText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+  partDetailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  messageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  messageInfo: {
-    flex: 1,
-  },
-  messageSender: {
+  partDetailText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: Colors.light.text,
-  },
-  messageDate: {
-    fontSize: 12,
     color: Colors.light.tabIconDefault,
   },
-  messageType: {
-    width: 24,
-    height: 24,
+  repairCard: {
+    backgroundColor: "white",
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+  },
+  repairHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  repairTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.text,
+    flex: 1,
+  },
+  repairDescription: {
+    fontSize: 14,
+    color: Colors.light.tabIconDefault,
+    marginBottom: 12,
+  },
+  repairDetails: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 12,
+  },
+  repairDetailItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  repairDetailText: {
+    fontSize: 14,
+    color: Colors.light.tabIconDefault,
+  },
+  partsUsed: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.light.border,
+    paddingTop: 12,
+  },
+  partsTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  partItem: {
+    fontSize: 14,
+    color: Colors.light.tabIconDefault,
+    marginLeft: 8,
+  },
+  messagesContainer: {
+    maxHeight: 400,
+    marginBottom: 16,
+  },
+  messageCard: {
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    maxWidth: "80%",
+  },
+  customerMessage: {
+    backgroundColor: Colors.light.primary,
+    alignSelf: "flex-end",
+  },
+  mechanicMessage: {
+    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    alignSelf: "flex-start",
   },
   messageText: {
     fontSize: 14,
     color: Colors.light.text,
-    lineHeight: 20,
+    marginBottom: 4,
+  },
+  messageTime: {
+    fontSize: 12,
+    color: Colors.light.tabIconDefault,
+  },
+  messageInput: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+    backgroundColor: "white",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    padding: 8,
+  },
+  messageTextInput: {
+    flex: 1,
+    fontSize: 16,
+    maxHeight: 100,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  attachButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 8,
+  },
+  sendButton: {
+    backgroundColor: Colors.light.primary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContainer: {
     flex: 1,
     backgroundColor: Colors.light.background,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: Colors.light.border,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.light.text,
   },
-  sendButton: {
+  modalSaveText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.light.primary,
   },
   modalContent: {
-    flex: 1,
     padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
   },
   inputLabel: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     color: Colors.light.text,
     marginBottom: 8,
   },
-  messageInput: {
+  input: {
     borderWidth: 1,
     borderColor: Colors.light.border,
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    backgroundColor: 'white',
-    height: 120,
+    backgroundColor: "white",
+  },
+  alarmTypes: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  alarmTypeButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    backgroundColor: "white",
+  },
+  alarmTypeButtonActive: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
+  },
+  alarmTypeText: {
+    fontSize: 14,
+    color: Colors.light.text,
+    fontWeight: "500",
+  },
+  alarmTypeTextActive: {
+    color: "white",
+  },
+  attachmentModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  attachmentModal: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  attachmentHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  attachmentTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.light.text,
+  },
+  attachmentOptions: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    padding: 30,
+  },
+  attachmentOption: {
+    alignItems: "center",
+    gap: 12,
+  },
+  attachmentOptionText: {
+    fontSize: 16,
+    color: Colors.light.text,
+    fontWeight: "600",
   },
 });
