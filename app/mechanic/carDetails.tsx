@@ -13,7 +13,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/Colors";
-import { mockData } from "@/constants/mockData";
+import { mockCars } from "@/constants/mockData";
 
 interface ServiceRecord {
   id: string;
@@ -24,7 +24,7 @@ interface ServiceRecord {
 }
 
 export default function MechanicCarDetailsScreen() {
-  const [selectedCar, setSelectedCar] = useState(mockData.cars[0]);
+  const [selectedCar, setSelectedCar] = useState(mockCars[0]);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [newService, setNewService] = useState({
     service: "",
@@ -74,9 +74,6 @@ export default function MechanicCarDetailsScreen() {
     { label: "Yıl", value: selectedCar.year },
     { label: "Renk", value: selectedCar.color },
     { label: "Plaka", value: selectedCar.plate },
-    { label: "Motor Hacmi", value: selectedCar.engineSize || "1.6L" },
-    { label: "Yakıt Türü", value: selectedCar.fuelType || "Benzin" },
-    { label: "Kilometre", value: selectedCar.mileage || "85,000 km" },
   ];
 
   return (

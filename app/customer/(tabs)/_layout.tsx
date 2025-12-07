@@ -1,5 +1,5 @@
 import Colors from "@/constants/Colors";
-import { Ionicons, FontAwesome } from "@expo/vector-icons";
+import { FontAwesome, Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -31,39 +31,51 @@ export default function CustomerTabLayout() {
           },
         }}
       >
-      <Tabs.Screen
-        name="map"
-        options={{
-          title: "Harita",
-          headerTitle: "Yakındaki Tamirciler",
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="map" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="home"
-        options={{
-          title: "Ana Sayfa",
-          headerTitle: "Tamircim - Müşteri",
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <FontAwesome name="wrench" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Profil",
-          headerTitle: "Profil",
-          headerShown: false,
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
-        }}
-      />
+        <Tabs.Screen
+          name="map"
+          options={{
+            title: "Harita",
+            headerTitle: "Yakındaki Tamirciler",
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="map" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="home"
+          options={{
+            title: "Ana Sayfa",
+            headerTitle: "Tamircim - Müşteri",
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => (
+              <FontAwesome name="wrench" size={size} color={color} />
+            ),
+          }}
+        />
+        {/* Garaj sekmesi - Home'un sağında, Profil'in solunda */}
+        <Tabs.Screen
+          name="garage"
+          options={{
+            title: "Garaj",
+            headerTitle: "Garaj",
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => (
+              <FontAwesome name="car" size={size} color={color} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="ProfileScreen"
+          options={{
+            title: "Profil",
+            headerTitle: "Profil",
+            headerShown: false,
+            tabBarIcon: ({ color, size }) => (
+              <Ionicons name="person" size={size} color={color} />
+            ),
+          }}
+        />
       </Tabs>
     </SafeAreaView>
   );

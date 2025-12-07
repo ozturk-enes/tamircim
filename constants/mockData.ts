@@ -293,3 +293,9 @@ export const getMessagesBetweenUsers = (userId1: string, userId2: string): Messa
     (message.senderId === userId2 && message.receiverId === userId1)
   );
 };
+
+export { mockCarDetailsData } from "../mockData/customer/carDetailsMock";
+export {
+  mechanicProfile, mockMessages as mechanicProfileMessages, mockActiveJobs, mockCarsToRepair, mockOffers
+} from "../mockData/mechanic/profileMock";
+

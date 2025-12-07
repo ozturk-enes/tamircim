@@ -2,7 +2,7 @@ import Colors from "@/constants/Colors";
 import { Job, mockCars, mockCustomers, mockJobs } from "@/constants/mockData";
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar"; // ✅ EKLENDİ
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
   Dimensions,
@@ -25,6 +25,14 @@ const MechanicDashboardScreen = () => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [price, setPrice] = useState("");
   const [workDetails, setWorkDetails] = useState("");
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [rejectJobId, setRejectJobId] = useState<string | null>(null);
+  const [now, setNow] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const handleAcceptJob = (jobId: string) => {
     Alert.alert(
@@ -36,13 +44,41 @@ const MechanicDashboardScreen = () => {
           text: "Evet",
           onPress: () => {
             const updatedJobs = jobs.map((job) =>
-              job.id === jobId ? { ...job, status: "accepted" } : job
+              job.id === jobId
+                ? { ...job, status: "accepted" as Job["status"] }
+                : job
             );
             setJobs(updatedJobs);
           },
         },
       ]
     );
+  };
+
+  const handleOpenReject = (jobId: string) => {
+    setRejectJobId(jobId);
+    setRejectModalVisible(true);
+  };
+
+  const handleConfirmReject = () => {
+    if (!rejectJobId) return;
+    const updatedJobs = jobs.map((job) =>
+      job.id === rejectJobId
+        ? { ...job, status: "rejected" as Job["status"] }
+        : job
+    );
+    setJobs(updatedJobs);
+    const idx = mockJobs.findIndex((j) => j.id === rejectJobId);
+    if (idx !== -1) {
+      mockJobs[idx].status = "rejected";
+    }
+    setRejectModalVisible(false);
+    setRejectJobId(null);
+  };
+
+  const handleCancelReject = () => {
+    setRejectModalVisible(false);
+    setRejectJobId(null);
   };
 
   const handleCompleteJob = (job: Job) => {
@@ -56,17 +92,33 @@ const MechanicDashboardScreen = () => {
       return;
     }
 
+    if (!selectedJob) {
+      Alert.alert("Hata", "Seçili iş bulunamadı.");
+      return;
+    }
+    const completedAt = new Date().toISOString();
     const updatedJobs = jobs.map((job) =>
       job.id === selectedJob.id
         ? {
             ...job,
-            status: "completed",
+            status: "completed" as Job["status"],
             paymentAmount: parseFloat(price),
             workDetails: workDetails,
+            completedAt,
           }
         : job
     );
     setJobs(updatedJobs);
+    const idx = mockJobs.findIndex((j) => j.id === selectedJob.id);
+    if (idx !== -1) {
+      mockJobs[idx] = {
+        ...mockJobs[idx],
+        status: "completed",
+        paymentAmount: parseFloat(price),
+        workDetails: workDetails,
+        completedAt,
+      } as any;
+    }
     setModalVisible(false);
     setPrice("");
     setWorkDetails("");
@@ -80,8 +132,21 @@ const MechanicDashboardScreen = () => {
         return jobs.filter(
           (job) => job.status === "in_progress" || job.status === "accepted"
         );
-      case "Tamamlanan":
-        return jobs.filter((job) => job.status === "completed");
+      case "Tamamlanan": {
+        const dayMs = 24 * 60 * 60 * 1000;
+        return jobs
+          .filter(
+            (job) =>
+              job.status === "completed" &&
+              job.completedAt &&
+              Date.now() - new Date(job.completedAt).getTime() <= dayMs
+          )
+          .sort(
+            (a, b) =>
+              new Date(b.completedAt || 0).getTime() -
+              new Date(a.completedAt || 0).getTime()
+          );
+      }
       default:
         return [];
     }
@@ -123,12 +188,20 @@ const MechanicDashboardScreen = () => {
           <Text style={styles.customerContact}>{customer?.phone}</Text>
         </View>
         {activeTab === "Bekleyen" && (
-          <TouchableOpacity
-            style={[styles.button, styles.acceptButton]}
-            onPress={() => handleAcceptJob(item.id)}
-          >
-            <Text style={styles.buttonText}>Kabul Et</Text>
-          </TouchableOpacity>
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.acceptButton]}
+              onPress={() => handleAcceptJob(item.id)}
+            >
+              <Text style={styles.buttonText}>Kabul Et</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.rejectButton]}
+              onPress={() => handleOpenReject(item.id)}
+            >
+              <Text style={styles.buttonText}>Reddet</Text>
+            </TouchableOpacity>
+          </View>
         )}
         {activeTab === "Devam Eden" && (
           <TouchableOpacity
@@ -219,6 +292,38 @@ const MechanicDashboardScreen = () => {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        animationType="fade"
+        transparent
+        visible={rejectModalVisible}
+        onRequestClose={handleCancelReject}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalView}>
+            <Text style={styles.modalText}>Onay</Text>
+            <Text
+              style={{ fontSize: 16, textAlign: "center", marginBottom: 20 }}
+            >
+              Reddetmek istediğinize emin misiniz?
+            </Text>
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.button, styles.primaryButton]}
+                onPress={handleConfirmReject}
+              >
+                <Text style={styles.buttonText}>Evet</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryButton]}
+                onPress={handleCancelReject}
+              >
+                <Text style={styles.buttonText}>Hayır</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -280,8 +385,12 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: "center",
   },
-  acceptButton: { backgroundColor: "#FFC107" },
+  acceptButton: { backgroundColor: Colors.light.success },
   completeButton: { backgroundColor: "#2196F3" },
+  rejectButton: { backgroundColor: Colors.light.error },
+  primaryButton: { backgroundColor: Colors.light.primary },
+  secondaryButton: { backgroundColor: "#9E9E9E" },
+  actionRow: { flexDirection: "row", gap: 10 },
   buttonText: { color: "white", fontWeight: "bold" },
   paymentInfo: {
     marginTop: 10,

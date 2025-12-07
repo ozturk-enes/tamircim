@@ -116,7 +116,7 @@ const Button: React.FC<ButtonProps> = ({
         )}
         {!loading && icon && <>{icon}</>}
         {title && !loading && (
-          <Text style={[textStyleCombined, icon && { marginLeft: 8 }]}>
+          <Text style={[textStyleCombined, icon ? { marginLeft: 8 } : undefined]}>
             {title}
           </Text>
         )}

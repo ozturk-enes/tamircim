@@ -1,7 +1,95 @@
-import { ApiResponse, Car, CarPart, Reminder, RepairHistory } from '../types';
+// Araç temel modelini projedeki ortak tiplerden alır
+import type { Car } from '@/constants/mockData';
 
-// Extended car details interface for car details page
+// Onarım geçmişi kayıt yapısı
+export interface RepairHistory {
+  id: string;
+  carId: string;
+  date: string;
+  type: string;
+  mechanicId: string;
+  mechanicName: string;
+  cost: number;
+  description: string;
+  parts: string[];
+  mileage: number;
+  workDuration: number;
+  warranty: number;
+  status: 'completed' | 'in_progress' | 'pending';
+  notes?: string;
+}
+
+// Araç parça değişim kayıtları
+export interface CarPart {
+  id: string;
+  carId: string;
+  name: string;
+  changeDate: string;
+  nextChangeDate: string;
+  mileage: number;
+  nextChangeMileage: number;
+  status: 'good' | 'warning' | 'critical';
+  brand?: string;
+  partNumber?: string;
+  warranty?: number;
+  cost?: number;
+}
+
+// Araç hatırlatıcıları (bakım, vize, sigorta vb.)
+export interface Reminder {
+  id: string;
+  carId: string;
+  title: string;
+  dueDate: string;
+  dueMileage: number | null;
+  type: 'service' | 'inspection' | 'insurance' | 'maintenance';
+  priority: 'low' | 'medium' | 'high';
+  description?: string;
+  isCompleted: boolean;
+  createdDate: string;
+  reminderDays?: number;
+}
+
+// Araç detay ekranı için genişletilmiş veri yapısı
 export interface CarDetailsData extends Car {
+  customerId?: string;
+  fuelType?: string;
+  mileage?: number;
+  lastService?: string;
+  nextService?: string;
+  vin?: string;
+  engineNumber?: string;
+  registrationDate?: string;
+  specifications?: {
+    engine?: string;
+    power?: string;
+    transmission?: string;
+    fuelCapacity?: string;
+    fuelConsumption?: string;
+    maxSpeed?: string;
+    acceleration?: string;
+    weight?: string;
+    dimensions?: string;
+    driveType?: string;
+    wheelSize?: string;
+    emissionStandard?: string;
+  };
+  insuranceInfo?: {
+    company: string;
+    policyNumber: string;
+    startDate: string;
+    endDate: string;
+    type: string;
+    coverage: string;
+  };
+  registrationInfo?: {
+    registrationNumber: string;
+    registrationDate: string;
+    inspectionDate: string;
+    nextInspectionDate: string;
+    registrationCity: string;
+  };
+  // Ekran alt sekmelerini besleyen koleksiyonlar
   repairHistory: RepairHistory[];
   changedParts: CarPart[];
   reminders: Reminder[];
@@ -39,6 +127,7 @@ export interface CarStatistics {
 }
 
 // Mock car details data
+// Araç detayları mock verisi
 export const mockCarDetailsData: CarDetailsData = {
   id: '1',
   customerId: '1',
@@ -340,7 +429,7 @@ export const mockCarDetailsData: CarDetailsData = {
     activeReminders: 4
   }
 };
-
+/*
 // API response functions
 export const getCarDetailsById = (carId: string): ApiResponse<CarDetailsData> => {
   // In a real app, this would fetch from API
@@ -361,54 +450,6 @@ export const getCarDetailsById = (carId: string): ApiResponse<CarDetailsData> =>
   };
 };
 
-export const getCarRepairHistory = (carId: string): ApiResponse<RepairHistory[]> => {
-  return {
-    success: true,
-    data: mockCarDetailsData.repairHistory,
-    message: 'Repair history retrieved successfully',
-    timestamp: new Date().toISOString()
-  };
-};
-
-export const getCarReminders = (carId: string): ApiResponse<Reminder[]> => {
-  return {
-    success: true,
-    data: mockCarDetailsData.reminders,
-    message: 'Car reminders retrieved successfully',
-    timestamp: new Date().toISOString()
-  };
-};
-
-export const getCarMessages = (carId: string): ApiResponse<CarMessage[]> => {
-  return {
-    success: true,
-    data: mockCarDetailsData.messages,
-    message: 'Car messages retrieved successfully',
-    timestamp: new Date().toISOString()
-  };
-};
-
-// Helper functions
-export const getActiveRemindersCount = (carId: string): number => {
-  return mockCarDetailsData.reminders.filter(reminder => !reminder.isCompleted).length;
-};
-
-export const getUnreadMessagesCount = (carId: string): number => {
-  return mockCarDetailsData.messages.filter(message => !message.isRead).length;
-};
-
-export const getNextServiceInfo = (carId: string) => {
-  const car = mockCarDetailsData;
-  const nextServiceDate = new Date(car.nextService);
-  const today = new Date();
-  const daysUntilService = Math.ceil((nextServiceDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  
-  return {
-    date: car.nextService,
-    daysRemaining: daysUntilService,
-    isOverdue: daysUntilService < 0
-  };
-};
 
 export const getPartStatusColor = (status: string): string => {
   switch (status) {
@@ -434,4 +475,4 @@ export const getReminderPriorityColor = (priority: string): string => {
     default:
       return '#6c757d';
   }
-};
+};*/

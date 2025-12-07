@@ -1,12 +1,15 @@
+import MechanicCardList from "@/components/shared/MechanicCardList";
+import SearchBar from "@/components/shared/SearchBar";
 import Colors from "@/constants/Colors";
-import { mockUsers } from "@/constants/mockData";
+import type { Car, Customer } from "@/constants/mockData";
+import { mockJobs, mockUsers } from "@/constants/mockData";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
   Animated,
   Dimensions,
-  FlatList,
   Linking,
   Modal,
   Platform,
@@ -37,6 +40,12 @@ export default function CustomerHomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMechanic, setSelectedMechanic] = useState<any>(null);
   const [modalAnimation] = useState(new Animated.Value(0));
+  const currentUser: Customer = mockUsers.customers[0];
+  const [appointmentVisible, setAppointmentVisible] = useState(false);
+  const [selectedCarId, setSelectedCarId] = useState<string | null>(
+    currentUser.cars[0]?.id ?? null
+  );
+  const [appointmentNote, setAppointmentNote] = useState("");
 
   const categories = [
     "Tümü",
@@ -101,7 +110,39 @@ export default function CustomerHomeScreen() {
   };
 
   const handleAppointment = () => {
-    Alert.alert("Randevu Talebi", "Randevu sistemi yakında aktif olacak!", [
+    setAppointmentVisible(true);
+  };
+
+  const submitAppointment = () => {
+    if (
+      !selectedMechanic ||
+      !selectedCarId ||
+      appointmentNote.trim().length === 0
+    ) {
+      Alert.alert("Eksik Bilgi", "Araç ve randevu nedeni gerekli.");
+      return;
+    }
+    const newJob = {
+      id: String(Date.now()),
+      customerId: currentUser.id,
+      mechanicId: selectedMechanic.id,
+      carId: selectedCarId,
+      title: "Randevu Talebi",
+      description: appointmentNote.trim(),
+      status: "pending" as const,
+      createdAt: new Date().toISOString(),
+      estimatedPrice: 0,
+      customerName: currentUser.name,
+      mechanicName: selectedMechanic.name,
+      carInfo: (() => {
+        const car = currentUser.cars.find((c) => c.id === selectedCarId);
+        return car ? `${car.brand} ${car.model} ${car.year}` : "";
+      })(),
+    };
+    (mockJobs as any).push(newJob);
+    setAppointmentVisible(false);
+    setAppointmentNote("");
+    Alert.alert("Randevu Talebi", "Talebiniz oluşturuldu (Bekleniyor).", [
       { text: "Tamam" },
     ]);
   };
@@ -223,32 +264,12 @@ export default function CustomerHomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons
-            name="search"
-            size={20}
-            color={Colors.light.tabIconDefault}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tamirci ara..."
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={Colors.light.tabIconDefault}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={Colors.light.tabIconDefault}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+      <SearchBar
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder="Tamirci ara..."
+        onClear={() => setSearchQuery("")}
+      />
 
       {/* Category Selector */}
       <View style={styles.categoryContainer}>
@@ -291,26 +312,24 @@ export default function CustomerHomeScreen() {
           </TouchableOpacity>
         </View>
 
-        <FlatList
-          data={filteredMechanics}
-          renderItem={renderMechanicCard}
-          keyExtractor={(item) => item.id.toString()}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyState}>
-              <Ionicons
-                name="search"
-                size={48}
-                color={Colors.light.tabIconDefault}
-              />
-              <Text style={styles.emptyText}>Tamirci bulunamadı</Text>
-              <Text style={styles.emptySubtext}>
-                Arama kriterlerinizi değiştirip tekrar deneyin
-              </Text>
-            </View>
-          )}
-        />
+        {filteredMechanics.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="search"
+              size={48}
+              color={Colors.light.tabIconDefault}
+            />
+            <Text style={styles.emptyText}>Tamirci bulunamadı</Text>
+            <Text style={styles.emptySubtext}>
+              Arama kriterlerinizi değiştirip tekrar deneyin
+            </Text>
+          </View>
+        ) : (
+          <MechanicCardList
+            data={filteredMechanics}
+            renderItem={renderMechanicCard}
+          />
+        )}
       </View>
 
       {/* Enhanced Modal */}
@@ -473,18 +492,79 @@ export default function CustomerHomeScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.callButton}
-                    onPress={() => handlePhoneCall(selectedMechanic.phone)}
+                    onPress={() => {
+                      closeModal();
+                      router.push({
+                        pathname: "/customer/(tabs)/map",
+                        params: { mechanicId: String(selectedMechanic.id) },
+                      });
+                    }}
                     activeOpacity={0.8}
                     accessible={true}
-                    accessibilityLabel="Ara"
+                    accessibilityLabel="Konuma Git"
                   >
-                    <Ionicons name="call" size={20} color="white" />
-                    <Text style={styles.callButtonText}>Ara</Text>
+                    <Ionicons name="navigate" size={20} color="white" />
+                    <Text style={styles.callButtonText}>Konuma Git</Text>
                   </TouchableOpacity>
                 </View>
               </>
             )}
           </Animated.View>
+        </View>
+      </Modal>
+
+      <Modal visible={appointmentVisible} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContentSmall}>
+            <View style={styles.modalHeaderSmall}>
+              <Text style={styles.modalTitle}>Randevu Al</Text>
+              <TouchableOpacity onPress={() => setAppointmentVisible(false)}>
+                <Ionicons
+                  name="close"
+                  size={22}
+                  color={Colors.light.tabIconDefault}
+                />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.detailLabel}>Araç Seç</Text>
+            <ScrollView style={{ maxHeight: 160 }}>
+              {currentUser.cars.map((car: Car) => (
+                <TouchableOpacity
+                  key={car.id}
+                  style={[
+                    styles.carOption,
+                    selectedCarId === car.id && styles.carOptionActive,
+                  ]}
+                  onPress={() => setSelectedCarId(car.id)}
+                >
+                  <Text style={styles.carOptionText}>
+                    {car.brand} {car.model} • {car.plate}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <Text style={[styles.detailLabel, { marginTop: 10 }]}>
+              Kısa Arıza Bilgisi
+            </Text>
+            <View style={styles.noteBox}>
+              <TextInput
+                value={appointmentNote}
+                onChangeText={setAppointmentNote}
+                placeholder="Örn: Frenlerden ses geliyor"
+                placeholderTextColor={Colors.light.tabIconDefault}
+                style={{ fontSize: 14, color: Colors.light.text }}
+                multiline
+              />
+            </View>
+            <TouchableOpacity
+              style={styles.appointmentSubmit}
+              onPress={submitAppointment}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="send" size={18} color="#fff" />
+              <Text style={styles.appointmentSubmitText}>Randevu Talep Et</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </View>
@@ -998,5 +1078,63 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "white",
     marginLeft: 8,
+  },
+  modalContentSmall: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    width: "100%",
+    padding: 16,
+    elevation: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
+  },
+  modalHeaderSmall: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  carOption: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    backgroundColor: "#FAFAFA",
+    marginBottom: 8,
+  },
+  carOptionActive: {
+    borderColor: Colors.light.primary,
+    backgroundColor: Colors.light.lightBlue,
+  },
+  carOptionText: {
+    fontSize: 14,
+    color: Colors.light.text,
+    fontWeight: "600",
+  },
+  noteBox: {
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: "#FAFAFA",
+    minHeight: 80,
+  },
+  appointmentSubmit: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.light.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    marginTop: 12,
+    gap: 8,
+  },
+  appointmentSubmitText: {
+    color: "white",
+    fontWeight: "700",
   },
 });

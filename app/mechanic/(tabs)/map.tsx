@@ -1,50 +1,46 @@
-import { mockMechanics, Mechanic } from "@/constants/mockData";
-import React, { useState, useRef, useEffect } from "react";
-import { 
-  StyleSheet, 
-  View, 
-  TouchableOpacity, 
-  Text, 
-  TextInput, 
-  FlatList, 
+import { Mechanic, mockMechanics } from "@/constants/mockData";
+import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
+import React, { useEffect, useRef, useState } from "react";
+import {
   Alert,
-  Dimensions,
-  Platform,
   Animated,
-  ScrollView,
+  FlatList,
+  Linking,
   Modal,
-  Linking
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
-import * as Location from 'expo-location';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  calculateDistance,
+  calculateRealisticRoute,
+  UserLocation,
+  NavigationInfo,
+  RouteStep,
+} from "@/utils/geo";
 
-interface UserLocation {
-  latitude: number;
-  longitude: number;
-}
 
-interface RouteStep {
-  instruction: string;
-  distance: number;
-  duration: number;
-  coordinates: {latitude: number, longitude: number}[];
-}
-
-interface NavigationInfo {
-  totalDistance: number;
-  totalDuration: number;
-  steps: RouteStep[];
-}
 
 const MapScreen = () => {
   const [searchExpanded, setSearchExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredMechanics, setFilteredMechanics] = useState<Mechanic[]>([]);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [selectedMechanic, setSelectedMechanic] = useState<Mechanic | null>(null);
-  const [routeCoordinates, setRouteCoordinates] = useState<{latitude: number, longitude: number}[]>([]);
-  const [navigationInfo, setNavigationInfo] = useState<NavigationInfo | null>(null);
+  const [selectedMechanic, setSelectedMechanic] = useState<Mechanic | null>(
+    null
+  );
+  const [routeCoordinates, setRouteCoordinates] = useState<
+    { latitude: number; longitude: number }[]
+  >([]);
+  const [navigationInfo, setNavigationInfo] = useState<NavigationInfo | null>(
+    null
+  );
   const [showNavigation, setShowNavigation] = useState(false);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -67,8 +63,11 @@ const MapScreen = () => {
   const getUserLocation = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Konum İzni', 'Konum özelliğini kullanmak için izin gerekli.');
+      if (status !== "granted") {
+        Alert.alert(
+          "Konum İzni",
+          "Konum özelliğini kullanmak için izin gerekli."
+        );
         return;
       }
 
@@ -78,15 +77,15 @@ const MapScreen = () => {
         longitude: location.coords.longitude,
       });
     } catch (error) {
-      console.error('Konum alınamadı:', error);
-      Alert.alert('Hata', 'Konum bilgisi alınamadı.');
+      console.error("Konum alınamadı:", error);
+      Alert.alert("Hata", "Konum bilgisi alınamadı.");
     }
   };
 
   const toggleSearchBar = () => {
     const toValue = searchExpanded ? 0 : 1;
     setSearchExpanded(!searchExpanded);
-    
+
     Animated.spring(searchAnimation, {
       toValue,
       useNativeDriver: false,
@@ -98,12 +97,13 @@ const MapScreen = () => {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     // Boşluk kontrolü kaldırıldı - direkt arama yapılabilir
-    const filtered = mockMechanics.filter((mechanic) =>
-      mechanic.name.toLowerCase().includes(query.toLowerCase()) ||
-      mechanic.specialties.some(specialty => 
-        specialty.toLowerCase().includes(query.toLowerCase())
-      ) ||
-      mechanic.location.address.toLowerCase().includes(query.toLowerCase())
+    const filtered = mockMechanics.filter(
+      (mechanic) =>
+        mechanic.name.toLowerCase().includes(query.toLowerCase()) ||
+        mechanic.specialties.some((specialty) =>
+          specialty.toLowerCase().includes(query.toLowerCase())
+        ) ||
+        mechanic.location.address.toLowerCase().includes(query.toLowerCase())
     );
     setFilteredMechanics(filtered);
   };
@@ -114,99 +114,35 @@ const MapScreen = () => {
     }
   };
 
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371; // Dünya'nın yarıçapı (km)
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    const distance = R * c;
-    return distance;
-  };
 
-  // Gerçekçi rota hesaplama algoritması
-  const calculateRealisticRoute = (start: UserLocation, end: {latitude: number, longitude: number}): NavigationInfo => {
-    const totalDistance = calculateDistance(start.latitude, start.longitude, end.latitude, end.longitude);
-    
-    // Şehir içi ortalama hız: 30 km/h
-    const averageSpeed = 30;
-    const totalDuration = (totalDistance / averageSpeed) * 60; // dakika cinsinden
-    
-    // Ara noktalar oluştur (gerçekçi yol takibi için)
-    const steps: RouteStep[] = [];
-    const numSteps = Math.max(3, Math.floor(totalDistance * 2)); // Her 500m'de bir adım
-    
-    for (let i = 0; i <= numSteps; i++) {
-      const ratio = i / numSteps;
-      const lat = start.latitude + (end.latitude - start.latitude) * ratio;
-      const lng = start.longitude + (end.longitude - start.longitude) * ratio;
-      
-      // Yol eğriliği simülasyonu (gerçek yollar düz değildir)
-      const curvature = Math.sin(ratio * Math.PI * 4) * 0.001;
-      const adjustedLat = lat + curvature;
-      const adjustedLng = lng + curvature * 0.5;
-      
-      if (i > 0) {
-        const stepDistance = calculateDistance(
-          steps[steps.length - 1]?.coordinates[0]?.latitude || start.latitude,
-          steps[steps.length - 1]?.coordinates[0]?.longitude || start.longitude,
-          adjustedLat,
-          adjustedLng
-        );
-        
-        const stepDuration = (stepDistance / averageSpeed) * 60;
-        
-        let instruction = "";
-        if (i === 1) instruction = "Rotaya başlayın";
-        else if (i === numSteps) instruction = "Hedefe ulaştınız";
-        else if (i % 3 === 0) instruction = "Düz devam edin";
-        else if (i % 4 === 0) instruction = "Sağa dönün";
-        else if (i % 5 === 0) instruction = "Sola dönün";
-        else instruction = "Yola devam edin";
-        
-        steps.push({
-          instruction,
-          distance: stepDistance,
-          duration: stepDuration,
-          coordinates: [{ latitude: adjustedLat, longitude: adjustedLng }]
-        });
-      }
-    }
-    
-    return {
-      totalDistance,
-      totalDuration,
-      steps
-    };
-  };
 
-  const createRoute = async (mechanicLocation: {latitude: number, longitude: number}) => {
+  const createRoute = async (mechanicLocation: {
+    latitude: number;
+    longitude: number;
+  }) => {
     if (!userLocation) {
-      Alert.alert('Konum Hatası', 'Kullanıcı konumu bulunamadı.');
+      Alert.alert("Konum Hatası", "Kullanıcı konumu bulunamadı.");
       return;
     }
 
     setIsCalculatingRoute(true);
-    
+
     // Rota hesaplama simülasyonu (1 saniye içinde)
     setTimeout(() => {
       const navInfo = calculateRealisticRoute(userLocation, mechanicLocation);
       setNavigationInfo(navInfo);
-      
+
       // Rota koordinatlarını oluştur
       const routeCoords = [userLocation];
-      navInfo.steps.forEach(step => {
+      navInfo.steps.forEach((step) => {
         routeCoords.push(...step.coordinates);
       });
       routeCoords.push(mechanicLocation);
-      
+
       setRouteCoordinates(routeCoords);
       setIsCalculatingRoute(false);
       setShowNavigation(true);
-      
+
       // Navigasyon panelini göster
       Animated.spring(navigationAnimation, {
         toValue: 1,
@@ -214,51 +150,66 @@ const MapScreen = () => {
         tension: 100,
         friction: 8,
       }).start();
-      
+
       // Haritayı rotayı gösterecek şekilde ayarla
       const minLat = Math.min(userLocation.latitude, mechanicLocation.latitude);
       const maxLat = Math.max(userLocation.latitude, mechanicLocation.latitude);
-      const minLng = Math.min(userLocation.longitude, mechanicLocation.longitude);
-      const maxLng = Math.max(userLocation.longitude, mechanicLocation.longitude);
-      
+      const minLng = Math.min(
+        userLocation.longitude,
+        mechanicLocation.longitude
+      );
+      const maxLng = Math.max(
+        userLocation.longitude,
+        mechanicLocation.longitude
+      );
+
       const latDelta = (maxLat - minLat) * 1.5;
       const lngDelta = (maxLng - minLng) * 1.5;
-      
-      mapRef.current?.animateToRegion({
-        latitude: (minLat + maxLat) / 2,
-        longitude: (minLng + maxLng) / 2,
-        latitudeDelta: Math.max(latDelta, 0.01),
-        longitudeDelta: Math.max(lngDelta, 0.01),
-      }, 1000);
+
+      mapRef.current?.animateToRegion(
+        {
+          latitude: (minLat + maxLat) / 2,
+          longitude: (minLng + maxLng) / 2,
+          latitudeDelta: Math.max(latDelta, 0.01),
+          longitudeDelta: Math.max(lngDelta, 0.01),
+        },
+        1000
+      );
     }, 800); // 0.8 saniye rota hesaplama süresi
   };
 
   // Google Maps'te rota oluşturma
   const openGoogleMapsRoute = (mechanic: Mechanic) => {
     if (!userLocation) {
-      Alert.alert('Konum Hatası', 'Kullanıcı konumu bulunamadı.');
+      Alert.alert("Konum Hatası", "Kullanıcı konumu bulunamadı.");
       return;
     }
 
     const origin = `${userLocation.latitude},${userLocation.longitude}`;
     const destination = `${mechanic.location.latitude},${mechanic.location.longitude}`;
     const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
-    
-    Linking.openURL(url).catch(err => {
-      console.error('Google Maps açılamadı:', err);
-      Alert.alert('Hata', 'Google Maps açılamadı. Lütfen uygulamanın yüklü olduğundan emin olun.');
+
+    Linking.openURL(url).catch((err) => {
+      console.error("Google Maps açılamadı:", err);
+      Alert.alert(
+        "Hata",
+        "Google Maps açılamadı. Lütfen uygulamanın yüklü olduğundan emin olun."
+      );
     });
   };
 
   // Konuma gitme (haritada gösterme)
   const goToLocation = (mechanic: Mechanic) => {
     setSelectedMechanic(mechanic);
-    mapRef.current?.animateToRegion({
-      latitude: mechanic.location.latitude,
-      longitude: mechanic.location.longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 1000);
+    mapRef.current?.animateToRegion(
+      {
+        latitude: mechanic.location.latitude,
+        longitude: mechanic.location.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      1000
+    );
     setModalVisible(false);
   };
 
@@ -268,7 +219,7 @@ const MapScreen = () => {
     setSearchExpanded(false);
     setSearchQuery("");
     setFilteredMechanics([]);
-    
+
     Animated.spring(searchAnimation, {
       toValue: 0,
       useNativeDriver: false,
@@ -280,7 +231,7 @@ const MapScreen = () => {
     setSelectedMechanic(null);
     setNavigationInfo(null);
     setShowNavigation(false);
-    
+
     Animated.spring(navigationAnimation, {
       toValue: 0,
       useNativeDriver: false,
@@ -297,7 +248,7 @@ const MapScreen = () => {
   };
 
   const renderMechanicItem = ({ item }: { item: Mechanic }) => {
-    const distance = userLocation 
+    const distance = userLocation
       ? calculateDistance(
           userLocation.latitude,
           userLocation.longitude,
@@ -313,16 +264,25 @@ const MapScreen = () => {
       >
         <View style={styles.mechanicInfo}>
           <Text style={styles.mechanicName}>{item.name}</Text>
-          <Text style={styles.mechanicSpecialties}>{item.specialties.join(', ')}</Text>
+          <Text style={styles.mechanicSpecialties}>
+            {item.specialties.join(", ")}
+          </Text>
           <Text style={styles.mechanicAddress}>{item.location.address}</Text>
           {distance && (
-            <Text style={styles.mechanicDistance}>{distance.toFixed(1)} km uzaklıkta</Text>
+            <Text style={styles.mechanicDistance}>
+              {distance.toFixed(1)} km uzaklıkta
+            </Text>
           )}
           <View style={styles.mechanicStats}>
             <Text style={styles.mechanicRating}>⭐ {item.rating}</Text>
             <Text style={styles.mechanicPrice}>{item.priceRange}</Text>
-            <Text style={[styles.mechanicStatus, { color: item.isOnline ? '#4CAF50' : '#F44336' }]}>
-              {item.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+            <Text
+              style={[
+                styles.mechanicStatus,
+                { color: item.isOnline ? "#4CAF50" : "#F44336" },
+              ]}
+            >
+              {item.isOnline ? "Çevrimiçi" : "Çevrimdışı"}
             </Text>
           </View>
         </View>
@@ -342,9 +302,9 @@ const MapScreen = () => {
 
   return (
     <View style={styles.container}>
-      <MapView 
+      <MapView
         ref={mapRef}
-        style={styles.map} 
+        style={styles.map}
         initialRegion={initialRegion}
         showsUserLocation={true}
         showsMyLocationButton={true}
@@ -361,11 +321,13 @@ const MapScreen = () => {
             }}
             title={mechanic.name}
             description={mechanic.specialties.join(", ")}
-            pinColor={selectedMechanic?.id === mechanic.id ? '#FF6B6B' : '#4CAF50'}
+            pinColor={
+              selectedMechanic?.id === mechanic.id ? "#FF6B6B" : "#4CAF50"
+            }
             onPress={() => handleMechanicSelect(mechanic)}
           />
         ))}
-        
+
         {routeCoordinates.length > 0 && (
           <Polyline
             coordinates={routeCoordinates}
@@ -377,19 +339,18 @@ const MapScreen = () => {
       </MapView>
 
       {/* Animasyonlu Arama Çubuğu */}
-      <Animated.View style={[styles.searchContainer, { height: searchBarHeight }]}>
-        <TouchableOpacity
-          style={styles.searchHeader}
-          onPress={toggleSearchBar}
-        >
+      <Animated.View
+        style={[styles.searchContainer, { height: searchBarHeight }]}
+      >
+        <TouchableOpacity style={styles.searchHeader} onPress={toggleSearchBar}>
           <Ionicons name="search" size={24} color="#666" />
           <Text style={styles.searchHeaderText}>
-            {searchExpanded ? 'Arama' : 'Tamirci Ara'}
+            {searchExpanded ? "Arama" : "Tamirci Ara"}
           </Text>
-          <Ionicons 
-            name={searchExpanded ? "chevron-up" : "chevron-down"} 
-            size={20} 
-            color="#666" 
+          <Ionicons
+            name={searchExpanded ? "chevron-up" : "chevron-down"}
+            size={20}
+            color="#666"
           />
         </TouchableOpacity>
 
@@ -404,7 +365,7 @@ const MapScreen = () => {
                 autoFocus={true}
                 onSubmitEditing={handleSearchButtonPress}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.searchButton}
                 onPress={handleSearchButtonPress}
               >
@@ -445,12 +406,14 @@ const MapScreen = () => {
             {modalMechanic && (
               <ScrollView style={styles.modalContent}>
                 <View style={styles.mechanicDetailCard}>
-                  <Text style={styles.modalMechanicName}>{modalMechanic.name}</Text>
-                  
+                  <Text style={styles.modalMechanicName}>
+                    {modalMechanic.name}
+                  </Text>
+
                   <View style={styles.modalInfoRow}>
                     <Ionicons name="build" size={16} color="#666" />
                     <Text style={styles.modalInfoText}>
-                      Uzmanlık: {modalMechanic.specialties.join(', ')}
+                      Uzmanlık: {modalMechanic.specialties.join(", ")}
                     </Text>
                   </View>
 
@@ -476,15 +439,25 @@ const MapScreen = () => {
                   </View>
 
                   <View style={styles.modalInfoRow}>
-                    <Ionicons 
-                      name={modalMechanic.isOnline ? "checkmark-circle" : "close-circle"} 
-                      size={16} 
-                      color={modalMechanic.isOnline ? "#4CAF50" : "#F44336"} 
+                    <Ionicons
+                      name={
+                        modalMechanic.isOnline
+                          ? "checkmark-circle"
+                          : "close-circle"
+                      }
+                      size={16}
+                      color={modalMechanic.isOnline ? "#4CAF50" : "#F44336"}
                     />
-                    <Text style={[styles.modalInfoText, { 
-                      color: modalMechanic.isOnline ? '#4CAF50' : '#F44336' 
-                    }]}>
-                      Durum: {modalMechanic.isOnline ? 'Çevrimiçi' : 'Çevrimdışı'}
+                    <Text
+                      style={[
+                        styles.modalInfoText,
+                        {
+                          color: modalMechanic.isOnline ? "#4CAF50" : "#F44336",
+                        },
+                      ]}
+                    >
+                      Durum:{" "}
+                      {modalMechanic.isOnline ? "Çevrimiçi" : "Çevrimdışı"}
                     </Text>
                   </View>
 
@@ -492,12 +465,14 @@ const MapScreen = () => {
                     <View style={styles.modalInfoRow}>
                       <Ionicons name="navigate" size={16} color="#2196F3" />
                       <Text style={styles.modalInfoText}>
-                        Mesafe: {calculateDistance(
+                        Mesafe:{" "}
+                        {calculateDistance(
                           userLocation.latitude,
                           userLocation.longitude,
                           modalMechanic.location.latitude,
                           modalMechanic.location.longitude
-                        ).toFixed(1)} km
+                        ).toFixed(1)}{" "}
+                        km
                       </Text>
                     </View>
                   )}
@@ -531,7 +506,9 @@ const MapScreen = () => {
 
       {/* Navigasyon Paneli */}
       {showNavigation && navigationInfo && (
-        <Animated.View style={[styles.navigationContainer, { height: navigationHeight }]}>
+        <Animated.View
+          style={[styles.navigationContainer, { height: navigationHeight }]}
+        >
           <View style={styles.navigationHeader}>
             <View style={styles.navigationInfo}>
               <Text style={styles.navigationDistance}>
@@ -541,17 +518,21 @@ const MapScreen = () => {
                 {formatDuration(navigationInfo.totalDuration)}
               </Text>
             </View>
-            <TouchableOpacity onPress={clearRoute} style={styles.closeNavButton}>
+            <TouchableOpacity
+              onPress={clearRoute}
+              style={styles.closeNavButton}
+            >
               <Ionicons name="close" size={20} color="#666" />
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.navigationSteps}>
             {navigationInfo.steps.slice(0, 3).map((step, index) => (
               <View key={index} style={styles.navigationStep}>
                 <Text style={styles.stepInstruction}>{step.instruction}</Text>
                 <Text style={styles.stepDistance}>
-                  {step.distance.toFixed(1)} km - {formatDuration(step.duration)}
+                  {step.distance.toFixed(1)} km -{" "}
+                  {formatDuration(step.duration)}
                 </Text>
               </View>
             ))}
@@ -579,41 +560,41 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   searchContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 30,
+    position: "absolute",
+    top: Platform.OS === "ios" ? 50 : 30,
     left: 20,
     right: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 15,
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   searchHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 18,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   searchHeaderText: {
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
   },
   searchContent: {
     flex: 1,
     padding: 16,
   },
   searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 16,
   },
   searchInput: {
@@ -621,207 +602,207 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: "#ddd",
     borderRadius: 10,
     fontSize: 16,
     marginRight: 8,
   },
   searchButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 10,
     minHeight: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   mechanicsList: {
     flex: 1,
   },
   mechanicItem: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     padding: 12,
     borderRadius: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: "#e9ecef",
   },
   mechanicInfo: {
     flex: 1,
   },
   mechanicName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 4,
   },
   mechanicSpecialties: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
     marginBottom: 2,
   },
   mechanicAddress: {
     fontSize: 12,
-    color: '#888',
+    color: "#888",
     marginBottom: 6,
   },
   mechanicDistance: {
     fontSize: 11,
-    color: '#2196F3',
-    fontWeight: '600',
+    color: "#2196F3",
+    fontWeight: "600",
     marginBottom: 6,
   },
   mechanicStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   mechanicRating: {
     fontSize: 12,
-    color: '#FF9800',
-    fontWeight: '600',
+    color: "#FF9800",
+    fontWeight: "600",
   },
   mechanicPrice: {
     fontSize: 12,
-    color: '#4CAF50',
-    fontWeight: '600',
+    color: "#4CAF50",
+    fontWeight: "600",
   },
   mechanicStatus: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   // Modal Stilleri
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
   modalContainer: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 20,
-    width: '100%',
-    maxHeight: '80%',
+    width: "100%",
+    maxHeight: "80%",
     elevation: 10,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 5,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
   },
   closeButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: "#f5f5f5",
     minHeight: 40,
     minWidth: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   modalContent: {
     padding: 20,
   },
   mechanicDetailCard: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: "#f8f9fa",
     padding: 16,
     borderRadius: 12,
     marginBottom: 20,
   },
   modalMechanicName: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: "bold",
+    color: "#333",
     marginBottom: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
   },
   modalInfoText: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
     marginLeft: 8,
     flex: 1,
   },
   modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     gap: 12,
   },
   modalButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 12,
     minHeight: 50,
   },
   locationButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: "#4CAF50",
   },
   routeButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: "#2196F3",
   },
   modalButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginLeft: 8,
   },
   navigationContainer: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 20,
     left: 20,
     right: 20,
-    backgroundColor: 'white',
+    backgroundColor: "white",
     borderRadius: 15,
     elevation: 5,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   navigationHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: "#f0f0f0",
   },
   navigationInfo: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   navigationDistance: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2196F3',
+    fontWeight: "bold",
+    color: "#2196F3",
     marginRight: 12,
   },
   navigationDuration: {
     fontSize: 14,
-    color: '#666',
+    color: "#666",
   },
   closeNavButton: {
     padding: 4,
@@ -833,26 +814,26 @@ const styles = StyleSheet.create({
   navigationStep: {
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: "#f5f5f5",
   },
   stepInstruction: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: "600",
+    color: "#333",
     marginBottom: 2,
   },
   stepDistance: {
     fontSize: 12,
-    color: '#666',
+    color: "#666",
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 0, 0, 0.3)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingContainer: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderRadius: 10,
@@ -860,8 +841,8 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#333',
-    fontWeight: '600',
+    color: "#333",
+    fontWeight: "600",
   },
 });
 

@@ -54,6 +54,17 @@ export default function MechanicTabLayout() {
         }}
       />
       <Tabs.Screen
+        name="history"
+        options={{
+          title: "Geçmiş",
+          headerTitle: "Geçmiş Tamirler",
+          headerShown: false,
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="time" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{
           title: "Profil",

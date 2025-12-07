@@ -1,419 +1,221 @@
 import React from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  Image, 
-  StyleSheet, 
-  ViewStyle, 
-  TextStyle 
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Mechanic } from '../../constants/mockData';
+import Colors from '@/constants/Colors';
+import type { Mechanic } from '@/constants/mockData';
 
-export interface MechanicCardProps {
-  mechanic: Mechanic;
-  onPress?: () => void;
-  onCallPress?: () => void;
-  onMessagePress?: () => void;
-  onLocationPress?: () => void;
-  variant?: 'default' | 'compact' | 'detailed';
-  showActions?: boolean;
-  showDistance?: boolean;
-  distance?: number;
-  isCurrentMechanic?: boolean;
-  style?: ViewStyle;
+interface Props {
+  mechanic: Mechanic & {
+    serviceTitle?: string;
+    distance?: string | number;
+    experience?: string;
+    completedJobs?: number;
+  };
+  onPress: () => void;
+  onCall: () => void;
 }
 
-const MechanicCard: React.FC<MechanicCardProps> = ({
-  mechanic,
-  onPress,
-  onCallPress,
-  onMessagePress,
-  onLocationPress,
-  variant = 'default',
-  showActions = true,
-  showDistance = false,
-  distance,
-  isCurrentMechanic = false,
-  style,
-}) => {
-  const getCardStyle = (): ViewStyle => {
-    const baseStyle: ViewStyle = {
-      borderRadius: 12,
-      marginVertical: 6,
-      marginHorizontal: 16,
-      overflow: 'hidden',
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    };
+export default function MechanicCard({ mechanic, onPress, onCall }: Props) {
+  return (
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8} accessible accessibilityLabel={`${mechanic.name} tamirci kartı`}>
+      <View style={styles.serviceHeader}>
+        <Text style={styles.serviceTitle}>{mechanic.serviceTitle || 'Hizmet'}</Text>
+        <View style={[styles.onlineIndicator, { backgroundColor: mechanic.isOnline ? Colors.light.success : Colors.light.tabIconDefault }]} />
+      </View>
 
-    if (variant === 'compact') {
-      baseStyle.marginVertical = 4;
-      baseStyle.marginHorizontal = 8;
-    }
-
-    return baseStyle;
-  };
-
-  const getContentStyle = (): ViewStyle => {
-    const baseStyle: ViewStyle = {
-      backgroundColor: '#FFFFFF',
-      padding: variant === 'compact' ? 12 : 16,
-    };
-
-    return baseStyle;
-  };
-
-  const renderHeader = () => {
-    return (
-      <View style={styles.header}>
-        <View style={styles.avatarContainer}>
-          <Image
-            source={mechanic.avatar || require('../../assets/images/favicon.png')}
-            style={[
-              styles.avatar,
-              variant === 'compact' && styles.avatarCompact
-            ]}
-          />
-          <View style={[
-            styles.onlineIndicator,
-            { backgroundColor: mechanic.isOnline ? '#34C759' : '#8E8E93' }
-          ]} />
+      <View style={styles.headerRow}>
+        <View style={styles.avatar}>
+          <Ionicons name="person" size={28} color="white" />
         </View>
-        
-        <View style={styles.headerInfo}>
-          <View style={styles.nameRow}>
-            <Text style={[
-              styles.name,
-              variant === 'compact' && styles.nameCompact
-            ]} numberOfLines={1}>
-              {mechanic.name}
-            </Text>
-            {isCurrentMechanic && (
-              <View style={styles.currentBadge}>
-                <Text style={styles.currentBadgeText}>Sen</Text>
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.ratingRow}>
-            <Ionicons name="star" size={14} color="#FFD700" />
-            <Text style={styles.rating}>
-              {mechanic.rating.toFixed(1)}
-            </Text>
-            <Text style={styles.reviewCount}>
-              ({mechanic.reviewCount} değerlendirme)
-            </Text>
-          </View>
-          
-          {showDistance && distance !== undefined && (
-            <View style={styles.distanceRow}>
-              <Ionicons name="location" size={12} color="#6C757D" />
-              <Text style={styles.distance}>
-                {distance.toFixed(1)} km uzaklıkta
-              </Text>
-            </View>
-          )}
-        </View>
-        
-        {variant !== 'compact' && (
-          <TouchableOpacity
-            style={styles.locationButton}
-            onPress={onLocationPress}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="location" size={20} color="#007AFF" />
+        <View style={styles.info}>
+          <Text style={styles.name}>{mechanic.name}</Text>
+
+          <TouchableOpacity style={styles.phoneRow} onPress={onCall} activeOpacity={0.7}>
+            <Ionicons name="call" size={14} color={Colors.light.primary} />
+            <Text style={styles.phoneText}>{mechanic.phone}</Text>
           </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
 
-  const renderSpecialties = () => {
-    if (variant === 'compact') return null;
+          <View style={styles.addressRow}>
+            <Ionicons name="location" size={14} color={Colors.light.tabIconDefault} />
+            <Text style={styles.addressText} numberOfLines={1}>{mechanic.location.address}</Text>
+          </View>
 
-    return (
-      <View style={styles.specialtiesContainer}>
-        <Text style={styles.specialtiesLabel}>Uzmanlık Alanları:</Text>
-        <View style={styles.specialtiesRow}>
-          {mechanic.specialties.slice(0, 3).map((specialty, index) => (
-            <View key={index} style={styles.specialtyTag}>
-              <Text style={styles.specialtyText}>{specialty}</Text>
-            </View>
-          ))}
-          {mechanic.specialties.length > 3 && (
-            <View style={styles.specialtyTag}>
-              <Text style={styles.specialtyText}>
-                +{mechanic.specialties.length - 3}
-              </Text>
-            </View>
-          )}
+          <View style={styles.workingHoursRow}>
+            <Ionicons name="time" size={14} color={Colors.light.tabIconDefault} />
+            <Text style={styles.workingHoursText}>{mechanic.workingHours}</Text>
+          </View>
         </View>
       </View>
-    );
-  };
 
-  const renderDetails = () => {
-    if (variant === 'compact') return null;
-
-    return (
-      <View style={styles.detailsContainer}>
-        <View style={styles.detailRow}>
-          <Ionicons name="cash" size={16} color="#6C757D" />
-          <Text style={styles.detailText}>{mechanic.priceRange}</Text>
+      <View style={styles.ratingPriceRow}>
+        <View style={styles.ratingRow}>
+          <Ionicons name="star" size={16} color="#FFD700" />
+          <Text style={styles.rating}>{mechanic.rating}</Text>
+          <Text style={styles.ratingCount}>({mechanic.reviewCount})</Text>
         </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="time" size={16} color="#6C757D" />
-          <Text style={styles.detailText}>{mechanic.workingHours}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Ionicons name="location" size={16} color="#6C757D" />
-          <Text style={styles.detailText} numberOfLines={1}>
-            {mechanic.location.address}
-          </Text>
-        </View>
+        <Text style={styles.priceRange}>{mechanic.priceRange}</Text>
       </View>
-    );
-  };
 
-  const renderActions = () => {
-    if (!showActions || variant === 'compact') return null;
-
-    return (
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.callButton]}
-          onPress={onCallPress}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="call" size={18} color="#FFFFFF" />
-          <Text style={styles.actionButtonText}>Ara</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.actionButton, styles.messageButton]}
-          onPress={onMessagePress}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="chatbubble" size={18} color="#007AFF" />
-          <Text style={[styles.actionButtonText, { color: '#007AFF' }]}>
-            Mesaj
-          </Text>
+      <View style={styles.footerRow}>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Ionicons name="location" size={12} color={Colors.light.tabIconDefault} />
+            <Text style={styles.statText}>{mechanic.distance ?? ''} km</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="briefcase" size={12} color={Colors.light.tabIconDefault} />
+            <Text style={styles.statText}>{mechanic.experience ?? ''}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="checkmark-circle" size={12} color={Colors.light.success} />
+            <Text style={styles.statText}>{mechanic.completedJobs ?? 0} iş</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.contactButton} onPress={onCall} activeOpacity={0.8}>
+          <Ionicons name="call" size={16} color="white" />
         </TouchableOpacity>
       </View>
-    );
-  };
-
-  const renderCard = () => {
-    const cardStyle = getCardStyle();
-    const contentStyle = getContentStyle();
-
-    const content = (
-      <View style={[cardStyle, style]}>
-        <View style={contentStyle}>
-          {renderHeader()}
-          {renderSpecialties()}
-          {renderDetails()}
-          {renderActions()}
-        </View>
-      </View>
-    );
-
-    if (isCurrentMechanic) {
-      return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-          <LinearGradient
-            colors={['#007AFF', '#0056CC']}
-            style={[cardStyle, style]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <View style={[contentStyle, { backgroundColor: 'rgba(255,255,255,0.95)' }]}>
-              {renderHeader()}
-              {renderSpecialties()}
-              {renderDetails()}
-              {renderActions()}
-            </View>
-          </LinearGradient>
-        </TouchableOpacity>
-      );
-    }
-
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-        {content}
-      </TouchableOpacity>
-    );
-  };
-
-  return renderCard();
-};
+    </TouchableOpacity>
+  );
+}
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
+  serviceHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.lightGray,
   },
-  avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F8F9FA',
-  },
-  avatarCompact: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-  },
-  onlineIndicator: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-  },
-  headerInfo: {
+  serviceTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.light.primary,
     flex: 1,
   },
-  nameRow: {
+  onlineIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.light.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  info: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.light.text,
+    marginBottom: 6,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+    paddingVertical: 2,
+  },
+  phoneText: {
+    fontSize: 14,
+    color: Colors.light.primary,
+    marginLeft: 6,
+    fontWeight: '500',
+  },
+  addressRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 4,
   },
-  name: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#212529',
-    flex: 1,
+  addressText: {
+    fontSize: 13,
+    color: Colors.light.tabIconDefault,
   },
-  nameCompact: {
-    fontSize: 16,
+  workingHoursRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  currentBadge: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 8,
+  workingHoursText: {
+    fontSize: 13,
+    color: Colors.light.tabIconDefault,
   },
-  currentBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
+  ratingPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 4,
   },
   rating: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#212529',
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.light.text,
     marginLeft: 4,
   },
-  reviewCount: {
+  ratingCount: {
     fontSize: 12,
-    color: '#6C757D',
-    marginLeft: 4,
-  },
-  distanceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  distance: {
-    fontSize: 12,
-    color: '#6C757D',
-    marginLeft: 4,
-  },
-  locationButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#F8F9FA',
-  },
-  specialtiesContainer: {
-    marginBottom: 12,
-  },
-  specialtiesLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
-    marginBottom: 6,
-  },
-  specialtiesRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  specialtyTag: {
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginRight: 6,
-    marginBottom: 4,
-  },
-  specialtyText: {
-    fontSize: 12,
-    color: '#1976D2',
-    fontWeight: '500',
-  },
-  detailsContainer: {
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#6C757D',
-    marginLeft: 8,
-    flex: 1,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginHorizontal: 4,
-  },
-  callButton: {
-    backgroundColor: '#34C759',
-  },
-  messageButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    color: Colors.light.tabIconDefault,
     marginLeft: 6,
   },
+  priceRange: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: Colors.light.secondary,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statText: {
+    fontSize: 12,
+    color: Colors.light.tabIconDefault,
+    marginLeft: 6,
+  },
+  contactButton: {
+    backgroundColor: Colors.light.primary,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
-
-export default MechanicCard;
