@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "test:customer-profile": "node -r ts-node/register -r tsconfig-paths/register scripts/testCustomerProfile.ts"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -36,7 +37,9 @@
   "devDependencies": {
     "@types/react": "~19.1.0",
     "react-test-renderer": "19.1.0",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0"
   },
   "private": true
 }
