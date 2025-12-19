@@ -1,24 +1,25 @@
 import Colors from "@/constants/Colors";
-import type { Job } from "@/constants/mockData";
-import { mockJobs, mockCars, mockCustomers } from "@/constants/mockData";
+import { cars, customers, serviceRecords } from "@/constants/mockData";
+import type { ServiceRecord } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
 export default function MechanicHistoryScreen() {
-  const historyJobs: Job[] = useMemo(() => {
-    return mockJobs
+  const historyJobs: ServiceRecord[] = useMemo(() => {
+    return serviceRecords
       .filter((j) => j.status === "completed")
       .sort(
         (a, b) =>
-          new Date(b.completedAt || b.createdAt).getTime() -
-          new Date(a.completedAt || a.createdAt).getTime()
+          new Date(b.completedAt || b.date).getTime() -
+          new Date(a.completedAt || a.date).getTime()
       );
   }, []);
 
-  const renderItem = ({ item }: { item: Job }) => {
-    const car = mockCars.find((c) => c.id === item.carId);
-    const customer = mockCustomers.find((c) => c.id === item.customerId);
+  const renderItem = ({ item }: { item: ServiceRecord }) => {
+    const car = cars.find((c) => c.id === item.carId);
+    const customer = customers.find((c) => c.id === car?.ownerId);
+
     return (
       <View style={styles.card}>
         <View style={styles.headerRow}>
@@ -26,18 +27,21 @@ export default function MechanicHistoryScreen() {
             {car?.brand} {car?.model} {car?.year}
           </Text>
           <Text style={styles.dateText}>
-            {new Date(item.completedAt || item.createdAt).toLocaleString()}
+            {new Date(item.completedAt || item.date).toLocaleString()}
           </Text>
         </View>
         <View style={styles.infoRow}>
           <Ionicons name="person-outline" size={16} color={Colors.light.text} />
-          <Text style={styles.infoText}>{customer?.name}</Text>
+          <Text style={styles.infoText}>
+            {customer?.name || "Bilinmeyen Müşteri"}
+          </Text>
         </View>
+        <Text style={styles.titleText}>{item.title}</Text>
         <Text style={styles.descText}>{item.description}</Text>
-        {!!item.paymentAmount && (
+        {!!item.cost && (
           <View style={styles.footerRow}>
             <Ionicons name="cash" size={16} color={Colors.light.success} />
-            <Text style={styles.amountText}>₺{item.paymentAmount}</Text>
+            <Text style={styles.amountText}>₺{item.cost}</Text>
           </View>
         )}
         {!!item.workDetails && (
@@ -92,11 +96,21 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 12, color: Colors.light.tabIconDefault },
   infoRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   infoText: { fontSize: 14, color: Colors.light.text },
-  descText: { fontSize: 13, color: Colors.light.text, marginTop: 6 },
-  footerRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
+  titleText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: Colors.light.text,
+    marginTop: 8,
+  },
+  descText: { fontSize: 13, color: Colors.light.text, marginTop: 4 },
+  footerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 8,
+  },
   amountText: { fontSize: 14, fontWeight: "700", color: Colors.light.success },
   workText: { fontSize: 12, color: Colors.light.tabIconDefault, marginTop: 4 },
   emptyState: { alignItems: "center", paddingTop: 40 },
   emptyText: { fontSize: 14, color: Colors.light.tabIconDefault, marginTop: 8 },
 });
-

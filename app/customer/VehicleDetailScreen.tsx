@@ -1,5 +1,6 @@
 import Colors from "@/constants/Colors";
-import { mockCars, mockJobs } from "@/constants/mockData";
+import { getCarFullDetails } from "@/services/mockService";
+import { Reminder } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useMemo, useState } from "react";
@@ -15,13 +16,14 @@ import {
 
 export default function VehicleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const car = mockCars.find((c) => c.id === id);
-  const recentJobs = mockJobs.filter((j) => j.carId === id);
+  
+  // Verileri servisten çekiyoruz
+  const { car, history, reminders: initialReminders } = getCarFullDetails(id || "");
+  const recentJobs = history;
 
   const [isReminderModalVisible, setReminderModalVisible] = useState(false);
-  const [reminders, setReminders] = useState<
-    Array<{ id: string; title: string; dueDate?: string; dueMileage?: number }>
-  >([]);
+  const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
+
   const [remTitle, setRemTitle] = useState("");
   const [remDate, setRemDate] = useState("");
   const [remMileage, setRemMileage] = useState("");
@@ -35,15 +37,16 @@ export default function VehicleDetailScreen() {
 
   const saveReminder = () => {
     if (!canSaveReminder) return;
-    setReminders((prev) => [
-      {
-        id: String(Date.now()),
-        title: remTitle.trim(),
-        dueDate: remDate.trim() || undefined,
-        dueMileage: remMileage.trim() ? Number(remMileage.trim()) : undefined,
-      },
-      ...prev,
-    ]);
+    const newReminder: Reminder = {
+      id: String(Date.now()),
+      carId: id || "",
+      title: remTitle.trim(),
+      dueDate: remDate.trim() || undefined,
+      dueMileage: remMileage.trim() ? Number(remMileage.trim()) : undefined,
+      isCompleted: false,
+    };
+    
+    setReminders((prev) => [newReminder, ...prev]);
     setRemTitle("");
     setRemDate("");
     setRemMileage("");
@@ -84,7 +87,7 @@ export default function VehicleDetailScreen() {
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>Renk:</Text>
-              <Text style={styles.value}>{car.color}</Text>
+              <Text style={styles.value}>{car.color || "-"}</Text>
             </View>
           </View>
         )}
@@ -109,7 +112,7 @@ export default function VehicleDetailScreen() {
                 <Text style={styles.jobDesc}>{job.description}</Text>
                 <View style={styles.jobMeta}>
                   <Text style={styles.jobMetaText}>
-                    {new Date(job.createdAt).toLocaleDateString()}
+                    {new Date(job.date).toLocaleDateString()}
                   </Text>
                   <Text style={styles.jobMetaText}>{job.status}</Text>
                 </View>
@@ -212,6 +215,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
     paddingHorizontal: 12,
     paddingVertical: 12,
+    paddingTop: 48, // Added padding for safe area approximation if needed, or keeping it same as original if it was handled by layout
   },
   headerButton: { padding: 6 },
   headerTitle: { color: "#fff", fontWeight: "700", fontSize: 16 },

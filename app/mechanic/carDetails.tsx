@@ -1,30 +1,23 @@
-import React, { useState } from "react";
-import {
-  StyleSheet,
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  TextInput,
-} from "react-native";
+import Colors from "@/constants/Colors";
+import { cars } from "@/constants/mockData";
+import { Car, ServiceRecord } from "@/types/schema";
+import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/Colors";
-import { mockCars } from "@/constants/mockData";
-
-interface ServiceRecord {
-  id: string;
-  date: string;
-  service: string;
-  cost: string;
-  notes: string;
-}
+import React, { useState } from "react";
+import {
+  Alert,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function MechanicCarDetailsScreen() {
-  const [selectedCar, setSelectedCar] = useState(mockCars[0]);
+  const [selectedCar, setSelectedCar] = useState<Car>(cars[0]);
   const [serviceModalVisible, setServiceModalVisible] = useState(false);
   const [newService, setNewService] = useState({
     service: "",
@@ -34,17 +27,25 @@ export default function MechanicCarDetailsScreen() {
   const [serviceHistory, setServiceHistory] = useState<ServiceRecord[]>([
     {
       id: "1",
+      carId: "c1",
+      mechanicId: "m1",
+      mechanicName: "Ali Usta",
       date: "2024-01-15",
-      service: "Yağ Değişimi",
-      cost: "₺350",
-      notes: "Motor yağı ve filtre değiştirildi. Araç durumu iyi.",
+      title: "Yağ Değişimi",
+      description: "Motor yağı ve filtre değiştirildi. Araç durumu iyi.",
+      cost: 350,
+      status: "completed",
     },
     {
       id: "2",
+      carId: "c1",
+      mechanicId: "m1",
+      mechanicName: "Ali Usta",
       date: "2024-01-10",
-      service: "Fren Balata Değişimi",
-      cost: "₺800",
-      notes: "Ön fren balataları değiştirildi. Test sürüşü yapıldı.",
+      title: "Fren Balata Değişimi",
+      description: "Ön fren balataları değiştirildi. Test sürüşü yapıldı.",
+      cost: 800,
+      status: "completed",
     },
   ]);
 
@@ -56,10 +57,14 @@ export default function MechanicCarDetailsScreen() {
 
     const service: ServiceRecord = {
       id: Date.now().toString(),
+      carId: selectedCar.id,
+      mechanicId: "m1", // Mock mechanic ID
+      mechanicName: "Ali Usta", // Mock mechanic name
       date: new Date().toISOString().split("T")[0],
-      service: newService.service,
-      cost: newService.cost,
-      notes: newService.notes,
+      title: newService.service,
+      description: newService.notes,
+      cost: parseFloat(newService.cost) || 0,
+      status: "completed",
     };
 
     setServiceHistory([service, ...serviceHistory]);
@@ -72,7 +77,7 @@ export default function MechanicCarDetailsScreen() {
     { label: "Marka", value: selectedCar.brand },
     { label: "Model", value: selectedCar.model },
     { label: "Yıl", value: selectedCar.year },
-    { label: "Renk", value: selectedCar.color },
+    { label: "Renk", value: selectedCar.color || "-" },
     { label: "Plaka", value: selectedCar.plate },
   ];
 
@@ -112,7 +117,8 @@ export default function MechanicCarDetailsScreen() {
                 {selectedCar.brand} {selectedCar.model}
               </Text>
               <Text style={styles.carSubtitle}>
-                {selectedCar.year} • {selectedCar.color}
+                {selectedCar.year}{" "}
+                {selectedCar.color ? `• ${selectedCar.color}` : ""}
               </Text>
               <Text style={styles.carPlate}>{selectedCar.plate}</Text>
             </View>
@@ -208,12 +214,12 @@ export default function MechanicCarDetailsScreen() {
             serviceHistory.map((service) => (
               <View key={service.id} style={styles.serviceCard}>
                 <View style={styles.serviceHeader}>
-                  <Text style={styles.serviceTitle}>{service.service}</Text>
-                  <Text style={styles.serviceCost}>{service.cost}</Text>
+                  <Text style={styles.serviceTitle}>{service.title}</Text>
+                  <Text style={styles.serviceCost}>₺{service.cost}</Text>
                 </View>
                 <Text style={styles.serviceDate}>{service.date}</Text>
-                {service.notes ? (
-                  <Text style={styles.serviceNotes}>{service.notes}</Text>
+                {service.description ? (
+                  <Text style={styles.serviceNotes}>{service.description}</Text>
                 ) : null}
               </View>
             ))

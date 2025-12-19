@@ -1,7 +1,12 @@
 import VehicleCard from "@/components/VehicleCard";
 import Colors from "@/constants/Colors";
-import type { Car, Job } from "@/constants/mockData";
-import { mockJobs, mockUsers } from "@/constants/mockData";
+import {
+  customers,
+  cars as mockCars,
+  reminders as mockReminders,
+  serviceRecords,
+} from "@/constants/mockData";
+import { Car, Reminder, ServiceRecord } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useMemo, useReducer, useState } from "react";
 import {
@@ -14,14 +19,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-type Reminder = {
-  id: string;
-  title: string;
-  dueDate?: string;
-  dueMileage?: number;
-  completed?: boolean;
-};
 
 type ModalState = {
   addVehicle: boolean;
@@ -57,8 +54,9 @@ function modalReducer(state: ModalState, action: ModalAction): ModalState {
 }
 
 export default function GarageTab() {
-  const currentUser = mockUsers.customers[0];
-  const [cars, setCars] = useState<Car[]>(currentUser.cars || []);
+  const currentUser = customers[0];
+  const userCars = mockCars.filter((c) => c.ownerId === currentUser.id);
+  const [cars, setCars] = useState<Car[]>(userCars);
 
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [state, dispatch] = useReducer(modalReducer, {
@@ -81,7 +79,14 @@ export default function GarageTab() {
 
   const [remindersByCar, setRemindersByCar] = useState<
     Record<string, Reminder[]>
-  >({});
+  >(() => {
+    const grouped: Record<string, Reminder[]> = {};
+    mockReminders.forEach((r) => {
+      if (!grouped[r.carId]) grouped[r.carId] = [];
+      grouped[r.carId].push(r);
+    });
+    return grouped;
+  });
   const [editingReminderId, setEditingReminderId] = useState<string | null>(
     null
   );
@@ -126,6 +131,7 @@ export default function GarageTab() {
     if (!canSaveVehicle) return;
     const newCar: Car = {
       id: String(Date.now()),
+      ownerId: currentUser.id,
       brand: brand.trim(),
       model: model.trim(),
       year: Number(year.trim()),
@@ -150,10 +156,11 @@ export default function GarageTab() {
     const carId = selectedCar.id;
     const entry: Reminder = {
       id: editingReminderId ?? String(Date.now()),
+      carId,
       title: remTitle.trim(),
       dueDate: remDate.trim() || undefined,
       dueMileage: remMileage.trim() ? Number(remMileage.trim()) : undefined,
-      completed: false,
+      isCompleted: false,
     };
     setRemindersByCar((prev) => {
       const list = prev[carId] || [];
@@ -178,13 +185,13 @@ export default function GarageTab() {
     setRemindersByCar((prev) => {
       const list = prev[carId] || [];
       const updated = list.map((r) =>
-        r.id === reminderId ? { ...r, completed: !r.completed } : r
+        r.id === reminderId ? { ...r, isCompleted: !r.isCompleted } : r
       );
       return { ...prev, [carId]: updated };
     });
   };
 
-  const getStatusLabel = (status: Job["status"]) => {
+  const getStatusLabel = (status: ServiceRecord["status"]) => {
     switch (status) {
       case "pending":
         return "Bekleniyor";
@@ -201,7 +208,7 @@ export default function GarageTab() {
     }
   };
 
-  const getStatusIcon = (status: Job["status"]) => {
+  const getStatusIcon = (status: ServiceRecord["status"]) => {
     if (status === "completed") {
       return <Text style={{ color: Colors.light.success }}>✓</Text>;
     }
@@ -217,9 +224,9 @@ export default function GarageTab() {
     return null;
   };
 
-  const jobsForSelected: Job[] = useMemo(() => {
+  const jobsForSelected: ServiceRecord[] = useMemo(() => {
     if (!selectedCar) return [];
-    return mockJobs.filter((j) => j.carId === selectedCar.id);
+    return serviceRecords.filter((j) => j.carId === selectedCar.id);
   }, [selectedCar]);
 
   const remindersForSelected: Reminder[] = useMemo(() => {
@@ -386,10 +393,14 @@ export default function GarageTab() {
                           />
                           <Text style={styles.jobTitle}>{job.title}</Text>
                         </View>
-                        <Text style={styles.jobDesc}>{job.description}</Text>
+                        <Text style={styles.jobDesc}>
+                          {job.description || ""}
+                        </Text>
                         <View style={styles.jobMeta}>
                           <Text style={styles.jobMetaText}>
-                            {new Date(job.createdAt).toLocaleDateString()}
+                            {job.date
+                              ? new Date(job.date).toLocaleDateString()
+                              : "—"}
                           </Text>
                           <View
                             style={{
@@ -451,10 +462,12 @@ export default function GarageTab() {
                             }
                           >
                             <Ionicons
-                              name={r.completed ? "checkbox" : "square-outline"}
+                              name={
+                                r.isCompleted ? "checkbox" : "square-outline"
+                              }
                               size={18}
                               color={
-                                r.completed
+                                r.isCompleted
                                   ? Colors.light.success
                                   : Colors.light.tabIconDefault
                               }
@@ -464,7 +477,7 @@ export default function GarageTab() {
                           <Text
                             style={[
                               styles.jobTitle,
-                              r.completed
+                              r.isCompleted
                                 ? {
                                     textDecorationLine: "line-through",
                                     color: Colors.light.tabIconDefault,
@@ -479,7 +492,7 @@ export default function GarageTab() {
                           <Text
                             style={[
                               styles.jobDesc,
-                              r.completed
+                              r.isCompleted
                                 ? { textDecorationLine: "line-through" }
                                 : null,
                             ]}
@@ -491,7 +504,7 @@ export default function GarageTab() {
                           <Text
                             style={[
                               styles.jobDesc,
-                              r.completed
+                              r.isCompleted
                                 ? { textDecorationLine: "line-through" }
                                 : null,
                             ]}

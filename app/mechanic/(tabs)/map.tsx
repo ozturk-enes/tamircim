@@ -1,4 +1,11 @@
-import { Mechanic, mockMechanics } from "@/constants/mockData";
+import { mechanics } from "@/constants/mockData";
+import { Mechanic } from "@/types/schema";
+import {
+  calculateDistance,
+  calculateRealisticRoute,
+  NavigationInfo,
+  UserLocation,
+} from "@/utils/geo";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import React, { useEffect, useRef, useState } from "react";
@@ -17,15 +24,6 @@ import {
   View,
 } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
-import {
-  calculateDistance,
-  calculateRealisticRoute,
-  UserLocation,
-  NavigationInfo,
-  RouteStep,
-} from "@/utils/geo";
-
-
 
 const MapScreen = () => {
   const [searchExpanded, setSearchExpanded] = useState(false);
@@ -97,13 +95,13 @@ const MapScreen = () => {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     // Boşluk kontrolü kaldırıldı - direkt arama yapılabilir
-    const filtered = mockMechanics.filter(
+    const filtered = mechanics.filter(
       (mechanic) =>
         mechanic.name.toLowerCase().includes(query.toLowerCase()) ||
         mechanic.specialties.some((specialty) =>
           specialty.toLowerCase().includes(query.toLowerCase())
         ) ||
-        mechanic.location.address.toLowerCase().includes(query.toLowerCase())
+        mechanic.address.toLowerCase().includes(query.toLowerCase())
     );
     setFilteredMechanics(filtered);
   };
@@ -113,8 +111,6 @@ const MapScreen = () => {
       handleSearch(searchQuery);
     }
   };
-
-
 
   const createRoute = async (mechanicLocation: {
     latitude: number;
@@ -267,7 +263,7 @@ const MapScreen = () => {
           <Text style={styles.mechanicSpecialties}>
             {item.specialties.join(", ")}
           </Text>
-          <Text style={styles.mechanicAddress}>{item.location.address}</Text>
+          <Text style={styles.mechanicAddress}>{item.address}</Text>
           {distance && (
             <Text style={styles.mechanicDistance}>
               {distance.toFixed(1)} km uzaklıkta
@@ -312,7 +308,7 @@ const MapScreen = () => {
         loadingIndicatorColor="#2196F3"
         loadingBackgroundColor="#ffffff"
       >
-        {mockMechanics.map((mechanic) => (
+        {mechanics.map((mechanic) => (
           <Marker
             key={mechanic.id}
             coordinate={{
@@ -420,7 +416,7 @@ const MapScreen = () => {
                   <View style={styles.modalInfoRow}>
                     <Ionicons name="location" size={16} color="#666" />
                     <Text style={styles.modalInfoText}>
-                      Adres: {modalMechanic.location.address}
+                      Adres: {modalMechanic.address}
                     </Text>
                   </View>
 

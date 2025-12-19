@@ -1,25 +1,24 @@
-import React from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
-  ViewStyle, 
-  TextStyle 
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Job } from '../../constants/mockData';
+import { ServiceRecord } from "@/types/schema";
+import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import {
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from "react-native";
 
 export interface JobCardProps {
-  job: Job;
+  job: ServiceRecord;
+  displayContactName?: string;
   onPress?: () => void;
   onAcceptPress?: () => void;
   onRejectPress?: () => void;
   onCompletePress?: () => void;
   onCallCustomerPress?: () => void;
   onMessageCustomerPress?: () => void;
-  variant?: 'default' | 'compact' | 'detailed';
+  variant?: "default" | "compact" | "detailed";
   showActions?: boolean;
   style?: ViewStyle;
   progress?: number; // 0-100 for in_progress jobs
@@ -33,7 +32,7 @@ const JobCard: React.FC<JobCardProps> = ({
   onCompletePress,
   onCallCustomerPress,
   onMessageCustomerPress,
-  variant = 'default',
+  variant = "default",
   showActions = true,
   style,
   progress = 0,
@@ -43,15 +42,15 @@ const JobCard: React.FC<JobCardProps> = ({
       borderRadius: 12,
       marginVertical: 6,
       marginHorizontal: 16,
-      overflow: 'hidden',
+      overflow: "hidden",
       elevation: 3,
-      shadowColor: '#000',
+      shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.1,
       shadowRadius: 4,
     };
 
-    if (variant === 'compact') {
+    if (variant === "compact") {
       baseStyle.marginVertical = 4;
       baseStyle.marginHorizontal = 8;
     }
@@ -61,447 +60,295 @@ const JobCard: React.FC<JobCardProps> = ({
 
   const getContentStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      backgroundColor: '#FFFFFF',
-      padding: variant === 'compact' ? 12 : 16,
+      backgroundColor: "#FFFFFF",
+      padding: variant === "compact" ? 12 : 16,
     };
 
     return baseStyle;
   };
 
-  const getStatusColor = (status: Job['status']): string => {
+  const getStatusColor = (status: ServiceRecord["status"]): string => {
     switch (status) {
-      case 'pending':
-        return '#FF9500';
-      case 'accepted':
-        return '#007AFF';
-      case 'in_progress':
-        return '#34C759';
-      case 'completed':
-        return '#28A745';
-      case 'rejected':
-        return '#DC3545';
+      case "pending":
+        return "#FF9500";
+      case "accepted":
+        return "#007AFF";
+      case "in_progress":
+        return "#34C759";
+      case "completed":
+        return "#28A745";
+      case "rejected":
+      case "cancelled":
+        return "#DC3545";
       default:
-        return '#6C757D';
+        return "#6C757D";
     }
   };
 
-  const getStatusText = (status: Job['status']): string => {
+  const getStatusText = (status: ServiceRecord["status"]): string => {
     switch (status) {
-      case 'pending':
-        return 'Bekliyor';
-      case 'accepted':
-        return 'Kabul Edildi';
-      case 'in_progress':
-        return 'Devam Ediyor';
-      case 'completed':
-        return 'Tamamlandı';
-      case 'rejected':
-        return 'Reddedildi';
+      case "pending":
+        return "Bekliyor";
+      case "accepted":
+        return "Kabul Edildi";
+      case "in_progress":
+        return "Devam Ediyor";
+      case "completed":
+        return "Tamamlandı";
+      case "rejected":
+        return "Reddedildi";
+      case "cancelled":
+        return "İptal Edildi";
       default:
-        return 'Bilinmiyor';
+        return "Bilinmiyor";
     }
   };
 
-  const getStatusIcon = (status: Job['status']): keyof typeof Ionicons.glyphMap => {
-    switch (status) {
-      case 'pending':
-        return 'time';
-      case 'accepted':
-        return 'checkmark-circle';
-      case 'in_progress':
-        return 'build';
-      case 'completed':
-        return 'checkmark-done-circle';
-      case 'rejected':
-        return 'close-circle';
-      default:
-        return 'help-circle';
-    }
-  };
-
-  const formatDate = (dateString: string): string => {
+  const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('tr-TR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return date.toLocaleDateString("tr-TR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
-  const renderHeader = () => {
-    return (
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={[
-            styles.jobTitle,
-            variant === 'compact' && styles.jobTitleCompact
-          ]} numberOfLines={1}>
-            {job.title}
-          </Text>
-          
-          <View style={styles.statusContainer}>
-            <View style={[
-              styles.statusBadge,
-              { backgroundColor: getStatusColor(job.status) }
-            ]}>
-              <Ionicons 
-                name={getStatusIcon(job.status)} 
-                size={12} 
-                color="#FFFFFF" 
-              />
-              <Text style={styles.statusText}>
-                {getStatusText(job.status)}
-              </Text>
-            </View>
-          </View>
-        </View>
-        
-        <View style={styles.headerRight}>
-          <Text style={styles.priceText}>
-            {job.actualPrice || job.estimatedPrice} TL
-          </Text>
-          {job.actualPrice && job.actualPrice !== job.estimatedPrice && (
-            <Text style={styles.estimatedPriceText}>
-              (Tahmini: {job.estimatedPrice} TL)
-            </Text>
-          )}
-        </View>
-      </View>
-    );
-  };
+  const renderStatusBadge = () => (
+    <View
+      style={[
+        styles.statusBadge,
+        { backgroundColor: getStatusColor(job.status) + "20" },
+      ]}
+    >
+      <Text style={[styles.statusText, { color: getStatusColor(job.status) }]}>
+        {getStatusText(job.status)}
+      </Text>
+    </View>
+  );
 
   const renderCustomerInfo = () => {
-    if (variant === 'compact') return null;
+    if (variant === "compact") return null;
 
     return (
       <View style={styles.customerContainer}>
         <View style={styles.customerRow}>
           <Ionicons name="person" size={16} color="#6C757D" />
           <Text style={styles.customerText}>
-            {job.customerName || 'Müşteri Bilgisi Yok'}
+            {job.mechanicName || "Müşteri Bilgisi Yok"}
           </Text>
         </View>
-        
-        <View style={styles.customerRow}>
-          <Ionicons name="car" size={16} color="#6C757D" />
-          <Text style={styles.customerText}>
-            {job.carInfo || 'Araç Bilgisi Yok'}
-          </Text>
-        </View>
-        
+
         <View style={styles.customerRow}>
           <Ionicons name="calendar" size={16} color="#6C757D" />
-          <Text style={styles.customerText}>
-            {formatDate(job.createdAt)}
-          </Text>
-        </View>
-      </View>
-    );
-  };
-
-  const renderDescription = () => {
-    if (variant === 'compact') return null;
-
-    return (
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionLabel}>Açıklama:</Text>
-        <Text style={styles.descriptionText} numberOfLines={3}>
-          {job.description}
-        </Text>
-      </View>
-    );
-  };
-
-  const renderProgress = () => {
-    if (job.status !== 'in_progress' || variant === 'compact') return null;
-
-    return (
-      <View style={styles.progressContainer}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressLabel}>İlerleme</Text>
-          <Text style={styles.progressPercentage}>{progress}%</Text>
-        </View>
-        <View style={styles.progressBar}>
-          <View style={[
-            styles.progressFill,
-            { width: `${progress}%` }
-          ]} />
+          <Text style={styles.customerText}>{formatDate(job.date)}</Text>
         </View>
       </View>
     );
   };
 
   const renderActions = () => {
-    if (!showActions || variant === 'compact') return null;
+    if (!showActions) return null;
 
-    const renderPendingActions = () => (
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.rejectButton]}
-          onPress={onRejectPress}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="close" size={16} color="#FFFFFF" />
-          <Text style={styles.actionButtonText}>Reddet</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[styles.actionButton, styles.acceptButton]}
-          onPress={onAcceptPress}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="checkmark" size={16} color="#FFFFFF" />
-          <Text style={styles.actionButtonText}>Kabul Et</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    if (job.status === "pending") {
+      return (
+        <View style={styles.actionContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.rejectButton]}
+            onPress={onRejectPress}
+          >
+            <Text style={[styles.actionButtonText, styles.rejectButtonText]}>
+              Reddet
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.acceptButton]}
+            onPress={onAcceptPress}
+          >
+            <Text style={styles.actionButtonText}>Kabul Et</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
 
-    const renderActiveActions = () => (
-      <View style={styles.actionsContainer}>
-        <View style={styles.actionsRow}>
+    if (job.status === "accepted") {
+      return (
+        <View style={styles.actionContainer}>
           <TouchableOpacity
             style={[styles.actionButton, styles.callButton]}
             onPress={onCallCustomerPress}
-            activeOpacity={0.8}
           >
-            <Ionicons name="call" size={16} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Ara</Text>
+            <Ionicons name="call" size={18} color="#FFF" />
           </TouchableOpacity>
-          
           <TouchableOpacity
             style={[styles.actionButton, styles.messageButton]}
             onPress={onMessageCustomerPress}
-            activeOpacity={0.8}
           >
-            <Ionicons name="chatbubble" size={16} color="#007AFF" />
-            <Text style={[styles.actionButtonText, { color: '#007AFF' }]}>
-              Mesaj
-            </Text>
+            <Ionicons name="chatbubble" size={18} color="#FFF" />
           </TouchableOpacity>
         </View>
-        
-        {job.status === 'in_progress' && (
-          <TouchableOpacity
-            style={styles.completeButton}
-            onPress={onCompletePress}
-            activeOpacity={0.8}
-          >
-            <LinearGradient
-              colors={['#34C759', '#28A745']}
-              style={styles.completeButtonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Ionicons name="checkmark-done" size={18} color="#FFFFFF" />
-              <Text style={styles.completeButtonText}>Tamamla</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-
-    switch (job.status) {
-      case 'pending':
-        return renderPendingActions();
-      case 'accepted':
-      case 'in_progress':
-        return renderActiveActions();
-      default:
-        return null;
+      );
     }
-  };
 
-  const renderCard = () => {
-    const cardStyle = getCardStyle();
-    const contentStyle = getContentStyle();
-
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9}>
-        <View style={[cardStyle, style]}>
-          <View style={contentStyle}>
-            {renderHeader()}
-            {renderCustomerInfo()}
-            {renderDescription()}
-            {renderProgress()}
-            {renderActions()}
-          </View>
+    if (job.status === "in_progress") {
+      return (
+        <View style={styles.actionContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.completeButton]}
+            onPress={onCompletePress}
+          >
+            <Text style={styles.actionButtonText}>Tamamla</Text>
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
-    );
+      );
+    }
+
+    return null;
   };
 
-  return renderCard();
+  return (
+    <TouchableOpacity
+      style={[getCardStyle(), style]}
+      onPress={onPress}
+      activeOpacity={0.9}
+    >
+      <View style={getContentStyle()}>
+        <View style={styles.header}>
+          <Text style={styles.title} numberOfLines={1}>
+            {job.title}
+          </Text>
+          {renderStatusBadge()}
+        </View>
+
+        <Text style={styles.description} numberOfLines={2}>
+          {job.description}
+        </Text>
+
+        {renderCustomerInfo()}
+
+        <View style={styles.footer}>
+          <Text style={styles.price}>{job.cost} ₺</Text>
+        </View>
+
+        {renderActions()}
+      </View>
+
+      {job.status === "in_progress" && progress > 0 && (
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { width: `${progress}%` }]} />
+        </View>
+      )}
+    </TouchableOpacity>
+  );
 };
 
 const styles = StyleSheet.create({
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
   },
-  headerLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  headerRight: {
-    alignItems: 'flex-end',
-  },
-  jobTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#212529',
-    marginBottom: 6,
-  },
-  jobTitleCompact: {
+  title: {
     fontSize: 16,
-    marginBottom: 4,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    fontWeight: "bold",
+    color: "#212529",
+    flex: 1,
+    marginRight: 8,
   },
   statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 8,
   },
   statusText: {
-    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
-    marginLeft: 4,
+    fontWeight: "600",
   },
-  priceText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#007AFF',
-  },
-  estimatedPriceText: {
-    fontSize: 12,
-    color: '#6C757D',
-    textDecorationLine: 'line-through',
-  },
-  customerContainer: {
+  description: {
+    fontSize: 14,
+    color: "#6C757D",
     marginBottom: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
-  },
-  customerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  customerText: {
-    fontSize: 14,
-    color: '#6C757D',
-    marginLeft: 8,
-    flex: 1,
-  },
-  descriptionContainer: {
-    marginBottom: 12,
-  },
-  descriptionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
-    marginBottom: 6,
-  },
-  descriptionText: {
-    fontSize: 14,
-    color: '#6C757D',
     lineHeight: 20,
   },
-  progressContainer: {
+  customerContainer: {
+    backgroundColor: "#F8F9FA",
+    padding: 10,
+    borderRadius: 8,
     marginBottom: 12,
   },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
+  customerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
   },
-  progressLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#495057',
+  customerText: {
+    fontSize: 13,
+    color: "#495057",
+    marginLeft: 8,
   },
-  progressPercentage: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#34C759',
-  },
-  progressBar: {
-    height: 6,
-    backgroundColor: '#E9ECEF',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#34C759',
-    borderRadius: 3,
-  },
-  actionsContainer: {
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  footer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
     marginBottom: 8,
+  },
+  price: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#212529",
+  },
+  actionContainer: {
+    flexDirection: "row",
+    marginTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#DEE2E6",
+    paddingTop: 12,
   },
   actionButton: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 10,
     borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
     marginHorizontal: 4,
   },
-  acceptButton: {
-    backgroundColor: '#34C759',
-  },
   rejectButton: {
-    backgroundColor: '#DC3545',
+    backgroundColor: "#FFF",
+    borderWidth: 1,
+    borderColor: "#DC3545",
+  },
+  rejectButtonText: {
+    color: "#DC3545",
+  },
+  acceptButton: {
+    backgroundColor: "#007AFF",
   },
   callButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: "#28A745",
+    flex: 0.5,
   },
   messageButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginLeft: 6,
+    backgroundColor: "#FF9500",
+    flex: 0.5,
   },
   completeButton: {
-    borderRadius: 8,
-    overflow: 'hidden',
+    backgroundColor: "#28A745",
   },
-  completeButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+  actionButtonText: {
+    color: "#FFF",
+    fontWeight: "600",
+    fontSize: 14,
   },
-  completeButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginLeft: 8,
+  progressContainer: {
+    height: 4,
+    backgroundColor: "#E9ECEF",
+    width: "100%",
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#34C759",
   },
 });
 

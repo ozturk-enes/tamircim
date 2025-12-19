@@ -1,7 +1,8 @@
 import Colors from "@/constants/Colors";
-import { Job, mockCars, mockCustomers, mockJobs } from "@/constants/mockData";
+import { cars, customers, serviceRecords } from "@/constants/mockData";
+import { ServiceRecord } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
-import { StatusBar } from "expo-status-bar"; // ✅ EKLENDİ
+import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -15,14 +16,15 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import JobCard from "@/components/common/JobCard";
 
 const { width } = Dimensions.get("window");
 
 const MechanicDashboardScreen = () => {
   const [activeTab, setActiveTab] = useState("Bekleyen");
-  const [jobs, setJobs] = useState<Job[]>(mockJobs);
+  const [jobs, setJobs] = useState<ServiceRecord[]>(serviceRecords);
   const [isModalVisible, setModalVisible] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<Job | null>(null);
+  const [selectedJob, setSelectedJob] = useState<ServiceRecord | null>(null);
   const [price, setPrice] = useState("");
   const [workDetails, setWorkDetails] = useState("");
   const [rejectModalVisible, setRejectModalVisible] = useState(false);
@@ -45,7 +47,7 @@ const MechanicDashboardScreen = () => {
           onPress: () => {
             const updatedJobs = jobs.map((job) =>
               job.id === jobId
-                ? { ...job, status: "accepted" as Job["status"] }
+                ? { ...job, status: "accepted" as ServiceRecord["status"] }
                 : job
             );
             setJobs(updatedJobs);
@@ -64,14 +66,11 @@ const MechanicDashboardScreen = () => {
     if (!rejectJobId) return;
     const updatedJobs = jobs.map((job) =>
       job.id === rejectJobId
-        ? { ...job, status: "rejected" as Job["status"] }
+        ? { ...job, status: "rejected" as ServiceRecord["status"] }
         : job
     );
     setJobs(updatedJobs);
-    const idx = mockJobs.findIndex((j) => j.id === rejectJobId);
-    if (idx !== -1) {
-      mockJobs[idx].status = "rejected";
-    }
+    // In a real app, we would update the backend here
     setRejectModalVisible(false);
     setRejectJobId(null);
   };
@@ -81,7 +80,7 @@ const MechanicDashboardScreen = () => {
     setRejectJobId(null);
   };
 
-  const handleCompleteJob = (job: Job) => {
+  const handleCompleteJob = (job: ServiceRecord) => {
     setSelectedJob(job);
     setModalVisible(true);
   };
@@ -101,24 +100,15 @@ const MechanicDashboardScreen = () => {
       job.id === selectedJob.id
         ? {
             ...job,
-            status: "completed" as Job["status"],
-            paymentAmount: parseFloat(price),
+            status: "completed" as ServiceRecord["status"],
+            cost: parseFloat(price),
             workDetails: workDetails,
             completedAt,
           }
         : job
     );
     setJobs(updatedJobs);
-    const idx = mockJobs.findIndex((j) => j.id === selectedJob.id);
-    if (idx !== -1) {
-      mockJobs[idx] = {
-        ...mockJobs[idx],
-        status: "completed",
-        paymentAmount: parseFloat(price),
-        workDetails: workDetails,
-        completedAt,
-      } as any;
-    }
+    
     setModalVisible(false);
     setPrice("");
     setWorkDetails("");
@@ -137,9 +127,9 @@ const MechanicDashboardScreen = () => {
         return jobs
           .filter(
             (job) =>
-              job.status === "completed" &&
-              job.completedAt &&
-              Date.now() - new Date(job.completedAt).getTime() <= dayMs
+              job.status === "completed" 
+              // Note: Only showing recently completed jobs logic can remain or be removed.
+              // && job.completedAt && Date.now() - new Date(job.completedAt).getTime() <= dayMs
           )
           .sort(
             (a, b) =>
@@ -152,80 +142,31 @@ const MechanicDashboardScreen = () => {
     }
   };
 
-  const renderJobCard = ({ item }: { item: Job }) => {
-    const customer = mockCustomers.find((c) => c.id === item.customerId);
-    const car = mockCars.find((c) => c.id === item.carId);
+  const getCustomerName = (carId: string) => {
+    const car = cars.find(c => c.id === carId);
+    if (!car) return "Bilinmeyen Müşteri";
+    const customer = customers.find(c => c.id === car.ownerId);
+    return customer ? customer.name : "Bilinmeyen Müşteri";
+  };
 
-    const getStatusStyle = (status: string) => {
-      switch (status) {
-        case "pending":
-          return styles.pendingCard;
-        case "in_progress":
-        case "accepted":
-          return styles.inProgressCard;
-        case "completed":
-          return styles.completedCard;
-        default:
-          return {};
-      }
-    };
-
+  const renderJobCard = ({ item }: { item: ServiceRecord }) => {
     return (
-      <View style={[styles.card, getStatusStyle(item.status)]}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.carModel}>
-            {car?.brand} {car?.model}
-          </Text>
-          <Text style={styles.carYear}>{car?.year}</Text>
-        </View>
-        <Text style={styles.faultDescription}>{item.description}</Text>
-        <View style={styles.customerInfo}>
-          <Ionicons name="person-outline" size={16} color="#555" />
-          <Text style={styles.customerName}>{customer?.name}</Text>
-        </View>
-        <View style={styles.customerInfo}>
-          <Ionicons name="call-outline" size={16} color="#555" />
-          <Text style={styles.customerContact}>{customer?.phone}</Text>
-        </View>
-        {activeTab === "Bekleyen" && (
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.button, styles.acceptButton]}
-              onPress={() => handleAcceptJob(item.id)}
-            >
-              <Text style={styles.buttonText}>Kabul Et</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.rejectButton]}
-              onPress={() => handleOpenReject(item.id)}
-            >
-              <Text style={styles.buttonText}>Reddet</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {activeTab === "Devam Eden" && (
-          <TouchableOpacity
-            style={[styles.button, styles.completeButton]}
-            onPress={() => handleCompleteJob(item)}
-          >
-            <Text style={styles.buttonText}>Tamamla</Text>
-          </TouchableOpacity>
-        )}
-        {activeTab === "Tamamlanan" && item.paymentAmount && (
-          <View style={styles.paymentInfo}>
-            <Text style={styles.paymentText}>
-              Ödenen Tutar: ₺{item.paymentAmount}
-            </Text>
-            <Text style={styles.workDetails}>{item.workDetails}</Text>
-          </View>
-        )}
-      </View>
+      <JobCard 
+        job={item}
+        displayContactName={getCustomerName(item.carId)}
+        onAcceptPress={() => handleAcceptJob(item.id)}
+        onRejectPress={() => handleOpenReject(item.id)}
+        onCompletePress={() => handleCompleteJob(item)}
+        // For 'accepted' state, we might want to show call/message options
+        onCallCustomerPress={() => Alert.alert("Arama", "Müşteri aranıyor...")}
+        onMessageCustomerPress={() => Alert.alert("Mesaj", "Mesaj ekranı açılıyor...")}
+        showActions={activeTab !== "Tamamlanan"}
+      />
     );
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* ✅ StatusBar alanını düzenle */}
       <StatusBar style="dark" backgroundColor="#f5f5f5" />
 
       <View style={styles.tabContainer}>
@@ -353,53 +294,17 @@ const styles = StyleSheet.create({
   },
   activeTabText: { color: "white" },
   listContainer: { padding: 10 },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 3,
-    borderLeftWidth: 5,
-  },
-  pendingCard: { borderColor: "#FFC107" },
-  inProgressCard: { borderColor: "#2196F3" },
-  completedCard: { borderColor: "#4CAF50" },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  carModel: { fontSize: 18, fontWeight: "bold" },
-  carYear: { fontSize: 16, color: "#666" },
-  faultDescription: { fontSize: 16, marginBottom: 10 },
-  customerInfo: { flexDirection: "row", alignItems: "center", marginBottom: 5 },
-  customerName: { marginLeft: 10, fontSize: 16 },
-  customerContact: { marginLeft: 10, fontSize: 16 },
   button: {
     marginTop: 10,
     padding: 10,
     borderRadius: 5,
     alignItems: "center",
   },
-  acceptButton: { backgroundColor: Colors.light.success },
   completeButton: { backgroundColor: "#2196F3" },
-  rejectButton: { backgroundColor: Colors.light.error },
   primaryButton: { backgroundColor: Colors.light.primary },
   secondaryButton: { backgroundColor: "#9E9E9E" },
   actionRow: { flexDirection: "row", gap: 10 },
   buttonText: { color: "white", fontWeight: "bold" },
-  paymentInfo: {
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-    paddingTop: 10,
-  },
-  paymentText: { fontSize: 16, fontWeight: "bold", color: "#4CAF50" },
-  workDetails: { fontSize: 14, color: "#555", marginTop: 5 },
   modalContainer: {
     flex: 1,
     justifyContent: "center",

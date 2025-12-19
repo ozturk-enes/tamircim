@@ -1,4 +1,4 @@
-import type { Mechanic } from '@/constants/mockData';
+import type { Mechanic } from '@/types/schema';
 
 export function filterMechanics(
   mechanics: Mechanic[],

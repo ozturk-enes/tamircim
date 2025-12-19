@@ -1,0 +1,35 @@
+[33mcommit a8174a6c631e94274765104255a41864f1efbb55[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m
+Author: EnEsCaN <enescanozturk552@gmail.com>
+Date:   Sun Dec 7 20:32:48 2025 +0300
+
+    tüm sayfalar gnel olarak tamamlandı
+
+[33mcommit 7269005265a3a8e4ad7b83da8a73a18e34d82e81[m
+Author: EnEsCaN <enescanozturk552@gmail.com>
+Date:   Sun Dec 7 20:09:16 2025 +0300
+
+    mechanic sayfası düzenlendi
+
+[33mcommit a2093ec2987fef5c52e436cffd7218afa0c56d2d[m
+Author: EnEsCaN <enescanozturk552@gmail.com>
+Date:   Mon Nov 17 00:35:03 2025 +0300
+
+    profil sayfası duzenlendi
+
+[33mcommit b1b64754b53d8db28a825bbc3cc26e5f4d929eff[m
+Author: EnEsCaN <enescanozturk552@gmail.com>
+Date:   Tue Oct 28 11:17:19 2025 +0300
+
+     giris sayfasına bckimg , map eklendi
+
+[33mcommit 3f6fec022a41e6b943a7f8249cbec8009832be5d[m
+Author: EnEsCaN <enescanozturk552@gmail.com>
+Date:   Sun Oct 26 21:27:07 2025 +0300
+
+    Resolve .gitignore conflict
+
+[33mcommit 263f5bc2c0488ae7e98c63672339711674e22b99[m
+Author: EnEsCaN <130938721+ozturk-enes@users.noreply.github.com>
+Date:   Wed Oct 22 21:22:04 2025 +0300
+
+    Initial commit

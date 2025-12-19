@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Car } from '../../constants/mockData';
+import { Car } from '@/types/schema';
 
 export interface CarCardProps {
   car: Car;

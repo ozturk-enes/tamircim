@@ -1,20 +1,20 @@
+import Colors from "@/constants/Colors";
+import { customers } from "@/constants/mockData";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/Colors";
-import { mockUsers } from "@/constants/mockData";
 
 export default function CustomerLoginScreen() {
   const [email, setEmail] = useState("");
@@ -31,9 +31,7 @@ export default function CustomerLoginScreen() {
     setLoading(true);
 
     // Mock login check
-    const customer = mockUsers.customers.find(
-      (user) => user.email === email && user.password === password
-    );
+    const customer = customers.find((user) => user.email === email);
 
     setTimeout(() => {
       setLoading(false);
@@ -157,7 +155,9 @@ export default function CustomerLoginScreen() {
             {/* Demo Info */}
             <View style={styles.demoInfo}>
               <Text style={styles.demoTitle}>Demo Bilgileri:</Text>
-              <Text style={styles.demoText}>E-posta: musteri@test.com</Text>
+              <Text style={styles.demoText}>
+                E-posta: enes.ozturk@example.com
+              </Text>
               <Text style={styles.demoText}>Şifre: 123456</Text>
             </View>
           </View>

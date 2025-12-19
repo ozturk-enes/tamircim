@@ -1,8 +1,8 @@
 import MechanicCardList from "@/components/shared/MechanicCardList";
 import SearchBar from "@/components/shared/SearchBar";
 import Colors from "@/constants/Colors";
-import type { Car, Customer } from "@/constants/mockData";
-import { mockJobs, mockUsers } from "@/constants/mockData";
+import { cars, customers, mechanics } from "@/constants/mockData";
+import type { Car, Customer } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
@@ -24,7 +24,7 @@ import {
 const { width } = Dimensions.get("window");
 
 // Enhanced mechanic data with additional details
-const mechanicsWithDetails = mockUsers.mechanics.map((mechanic, index) => ({
+const mechanicsWithDetails = mechanics.map((mechanic, index) => ({
   ...mechanic,
   distance: (Math.random() * 10 + 0.5).toFixed(1), // Distance 0.5-10.5 km
   completedJobs: Math.floor(Math.random() * 100 + 20), // 20-120 completed jobs
@@ -32,6 +32,9 @@ const mechanicsWithDetails = mockUsers.mechanics.map((mechanic, index) => ({
   serviceTitle: mechanic.specialties[0] + " Uzmanı", // Primary service title
   experience: Math.floor(Math.random() * 15 + 2) + " yıl", // 2-17 years experience
   averageResponseTime: Math.floor(Math.random() * 60 + 15) + " dk", // 15-75 minutes
+  // Add missing properties that were expected by the component but might not be in Mechanic type
+  priceRange: "₺500 - ₺5000", // Mock price range
+  location: { ...mechanic.location, address: mechanic.address }, // Ensure address is accessible
 }));
 
 export default function CustomerHomeScreen() {
@@ -40,21 +43,36 @@ export default function CustomerHomeScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMechanic, setSelectedMechanic] = useState<any>(null);
   const [modalAnimation] = useState(new Animated.Value(0));
-  const currentUser: Customer = mockUsers.customers[0];
+
+  const currentUser: Customer = customers[0];
+  const userCars = cars.filter((c) => c.ownerId === currentUser.id);
+
   const [appointmentVisible, setAppointmentVisible] = useState(false);
   const [selectedCarId, setSelectedCarId] = useState<string | null>(
-    currentUser.cars[0]?.id ?? null
+    userCars[0]?.id ?? null
   );
   const [appointmentNote, setAppointmentNote] = useState("");
 
   const categories = [
     "Tümü",
-    "Oto Elektrik",
-    "Kaporta",
+    "Periyodik Bakım",
     "Motor",
+    "Oto Elektrik",
+    "Kaporta & Boya",
     "Fren Sistemi",
+    "Şanzıman",
+    "Oto Lastik & Jant",
     "Klima",
-    "Lastik",
+    "Ekspertiz",
+    "Çekici",
+    "Egzoz",
+    "Akü",
+    "Oto Yıkama & Kuaför",
+    "Cam & Kilit",
+    "Döşeme",
+    "LPG & Otogaz",
+    "Tuning & Aksesuar",
+    "Diğer",
   ];
 
   const filteredMechanics = mechanicsWithDetails.filter((mechanic) => {
@@ -65,7 +83,7 @@ export default function CustomerHomeScreen() {
       );
     const matchesCategory =
       selectedCategory === "Tümü" ||
-      mechanic.specialties.includes(selectedCategory);
+      mechanic.specialties.includes(selectedCategory as any);
 
     return matchesSearch && matchesCategory;
   });
@@ -122,24 +140,22 @@ export default function CustomerHomeScreen() {
       Alert.alert("Eksik Bilgi", "Araç ve randevu nedeni gerekli.");
       return;
     }
-    const newJob = {
+    const newJob: any = {
       id: String(Date.now()),
-      customerId: currentUser.id,
-      mechanicId: selectedMechanic.id,
       carId: selectedCarId,
+      mechanicId: selectedMechanic.id,
+      mechanicName: selectedMechanic.name,
+      date: new Date().toISOString(),
       title: "Randevu Talebi",
       description: appointmentNote.trim(),
-      status: "pending" as const,
-      createdAt: new Date().toISOString(),
-      estimatedPrice: 0,
-      customerName: currentUser.name,
-      mechanicName: selectedMechanic.name,
-      carInfo: (() => {
-        const car = currentUser.cars.find((c) => c.id === selectedCarId);
-        return car ? `${car.brand} ${car.model} ${car.year}` : "";
-      })(),
+      cost: 0,
+      status: "pending",
     };
-    (mockJobs as any).push(newJob);
+    // Mock service records array for demonstration
+    if (!(globalThis as any).serviceRecords) {
+      (globalThis as any).serviceRecords = [];
+    }
+    ((globalThis as any).serviceRecords as any[]).push(newJob);
     setAppointmentVisible(false);
     setAppointmentNote("");
     Alert.alert("Randevu Talebi", "Talebiniz oluşturuldu (Bekleniyor).", [
@@ -197,7 +213,7 @@ export default function CustomerHomeScreen() {
               color={Colors.light.tabIconDefault}
             />
             <Text style={styles.addressText} numberOfLines={1}>
-              {item.location.address}
+              {item.address}
             </Text>
           </View>
 
@@ -528,7 +544,7 @@ export default function CustomerHomeScreen() {
             </View>
             <Text style={styles.detailLabel}>Araç Seç</Text>
             <ScrollView style={{ maxHeight: 160 }}>
-              {currentUser.cars.map((car: Car) => (
+              {userCars.map((car: Car) => (
                 <TouchableOpacity
                   key={car.id}
                   style={[

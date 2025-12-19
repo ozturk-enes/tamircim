@@ -1,6 +1,6 @@
 import Colors from "@/constants/Colors";
-import type { Customer } from "@/constants/mockData";
-import { mockUsers } from "@/constants/mockData";
+import { customers } from "@/constants/mockData";
+import { Customer } from "@/types/schema";
 import {
   isStrongPassword,
   isValidEmail,
@@ -24,7 +24,7 @@ import {
 
 export default function CustomerProfileScreen() {
   const [customer, setCustomer] = useState<Customer>({
-    ...mockUsers.customers[0],
+    ...customers[0],
   });
   const [editMode, setEditMode] = useState(false);
   const [passwordModalVisible, setPasswordModalVisible] = useState(false);
@@ -54,20 +54,18 @@ export default function CustomerProfileScreen() {
     }
     const updated: Customer = { ...customer, name, email, phone, address };
     setCustomer(updated);
-    const idx = mockUsers.customers.findIndex((c) => c.id === customer.id);
+    const idx = customers.findIndex((c) => c.id === customer.id);
     if (idx !== -1) {
-      (mockUsers.customers as any)[idx] = updated as any;
+      (customers as any)[idx] = updated as any;
     }
     setEditMode(false);
     Alert.alert("Başarılı", "Profil güncellendi.");
   }, [customer, formName, formEmail, formPhone, formAddress]);
 
   const changePassword = useCallback(() => {
-    const idx = mockUsers.customers.findIndex((c) => c.id === customer.id);
-    const current =
-      idx !== -1 ? (mockUsers.customers as any)[idx].password : undefined;
-    if (!current || current !== currentPassword) {
-      Alert.alert("Hata", "Mevcut şifre yanlış.");
+    // Mock password check - assume current password is "123456" for demo
+    if (currentPassword !== "123456") {
+      Alert.alert("Hata", "Mevcut şifre yanlış. (Demo için: 123456)");
       return;
     }
     if (!isStrongPassword(newPassword)) {
@@ -81,9 +79,7 @@ export default function CustomerProfileScreen() {
       Alert.alert("Hata", "Yeni şifreler eşleşmiyor.");
       return;
     }
-    if (idx !== -1) {
-      (mockUsers.customers as any)[idx].password = newPassword;
-    }
+
     setPasswordModalVisible(false);
     setCurrentPassword("");
     setNewPassword("");
