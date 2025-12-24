@@ -1,5 +1,6 @@
 import Colors from "@/constants/Colors";
-import { mechanics } from "@/constants/mockData";
+import { useAuthStore } from "@/store/authStore"; // AuthStore
+import { useDataStore } from "@/store/dataStore"; // Veritabanı
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -23,26 +24,41 @@ export default function MechanicLoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Hata", "Lütfen tüm alanları doldurun.");
+    // 1. Boş Alan Kontrolü
+    if (!email.trim() || !password.trim()) {
+      Alert.alert("Hata", "Lütfen e-posta ve şifrenizi girin.");
       return;
     }
 
     setLoading(true);
 
-    // Mock login check
-    const mechanic = mechanics.find((user) => user.email === email);
+    // 2. Veritabanından (Store) tamircileri çek
+    // Zustand store'dan anlık veriyi alıyoruz
+    const allMechanics = useDataStore.getState().mechanics;
+
+    // 3. E-posta eşleşmesi (Büyük/küçük harf duyarlılığını kaldırarak)
+    const foundMechanic = allMechanics.find(
+      (m) => m.email.trim().toLowerCase() === email.trim().toLowerCase()
+    );
 
     setTimeout(() => {
       setLoading(false);
-      if (mechanic) {
-        Alert.alert("Başarılı", "Giriş başarılı!", [
+
+      // 4. Şifre Kontrolü
+      if (foundMechanic && foundMechanic.password === password) {
+        // --- BAŞARILI GİRİŞ ---
+        // AuthStore'a kullanıcıyı kaydet
+        // 'mechanic' tipini belirtiyoruz
+        useAuthStore.getState().login(foundMechanic, "mechanic");
+
+        Alert.alert("Başarılı", `Hoş geldin ${foundMechanic.name}!`, [
           {
             text: "Tamam",
             onPress: () => router.replace("/mechanic/(tabs)/home"),
           },
         ]);
       } else {
+        // --- HATALI GİRİŞ ---
         Alert.alert("Hata", "E-posta veya şifre hatalı.");
       }
     }, 1000);
@@ -157,8 +173,9 @@ export default function MechanicLoginScreen() {
             {/* Demo Info */}
             <View style={styles.demoInfo}>
               <Text style={styles.demoTitle}>Demo Bilgileri:</Text>
-              <Text style={styles.demoText}>E-posta: ali.usta@example.com</Text>
-              <Text style={styles.demoText}>Şifre: 123456</Text>
+              {/* Seed Data'daki gerçek veriyi yazdım */}
+              <Text style={styles.demoText}>E-posta: ali@tamir.com</Text>
+              <Text style={styles.demoText}>Şifre: ali123</Text>
             </View>
           </View>
         </ScrollView>

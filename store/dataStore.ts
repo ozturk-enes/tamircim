@@ -1,138 +1,142 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import { mockJobs, mockUsers } from '../constants/mockData';
-import { Customer, Job, Mechanic } from '../types';
+// Not: Dosya adını 'seeData.ts' yaptıysan bu şekilde kalmalı, 'seedData.ts' ise 'd' harfini eklemeyi unutma.
+import { seedCars, seedCustomers, seedJobs, seedMechanics, seedReminders } from '@/constants/seeData';
+import { Car, Customer, Job, Mechanic, Reminder } from '@/types/schema';
 
 interface DataState {
+  // --- STATE (Veriler) ---
   customers: Customer[];
   mechanics: Mechanic[];
+  cars: Car[];
   jobs: Job[];
+  reminders: Reminder[];
   
-  // Actions
+  // --- ACTIONS (İşlemler) ---
+  
+  // Ekleme İşlemleri
   addCustomer: (customer: Customer) => void;
-  updateCustomer: (id: string, updates: Partial<Customer>) => void;
-  
   addMechanic: (mechanic: Mechanic) => void;
-  updateMechanic: (id: string, updates: Partial<Mechanic>) => void;
-  
+  addCar: (car: Car) => void;
   addJob: (job: Job) => void;
-  updateJobStatus: (jobId: string, status: Job['status']) => void;
-  completeJob: (jobId: string, paymentAmount: number, workDetails: string) => void;
   
-  rateMechanic: (mechanicId: string, rating: number, comment?: string) => void;
+  // Güncelleme İşlemleri (EKLENEN KISIMLAR)
+  updateJobStatus: (jobId: string, status: Job['status']) => void;
+  updateCustomer: (id: string, updates: Partial<Customer>) => void; // Profil güncellemesi için gerekli
+  updateMechanic: (id: string, updates: Partial<Mechanic>) => void; // Tamirci profili için gerekli
+  
+  // Araç ve Hatırlatıcı İşlemleri
+  removeCar: (carId: string) => void;
+  addReminder: (reminder: Reminder) => void;
+  toggleReminder: (reminderId: string) => void;
+  
+  // Değerlendirme
+  rateJob: (jobId: string, rating: number, comment?: string) => void;
 }
-
-// Initial State from Mock Data
-// We need to ensure we map the mock data correctly.
-// mockUsers.mechanics seems to be the source for mechanics.
-// mockUsers.customers seems to be the source for customers.
 
 export const useDataStore = create<DataState>()(
   persist(
     (set, get) => ({
-      customers: mockUsers.customers as unknown as Customer[],
-      mechanics: mockUsers.mechanics.map(m => ({
-        ...m,
-        // Ensure all required fields are present if mock data is missing some
-        rating: m.rating || 0,
-        reviewCount: m.reviewCount || 0,
-        // Enhanced data populated once
-        distance: (Math.random() * 10 + 0.5).toFixed(1),
-        completedJobs: Math.floor(Math.random() * 100 + 20),
-        responseTime: Math.floor(Math.random() * 30 + 5),
-        serviceTitle: (m.specialties && m.specialties.length > 0 ? m.specialties[0] : 'Genel') + " Uzmanı",
-        experience: (Math.floor(Math.random() * 15 + 2)) + " yıl",
-        averageResponseTime: (Math.floor(Math.random() * 60 + 15)) + " dk",
-      })) as unknown as Mechanic[],
-      jobs: mockJobs as unknown as Job[],
-      messages: [
-        {
-            id: "1",
-            senderId: "cust1",
-            receiverId: "mech1",
-            senderName: "Mehmet Demir",
-            content: "Merhaba, aracımın motor arızası için ne zaman bakabilirsiniz?",
-            timestamp: "14:30",
-            isRead: false,
-            senderType: 'customer',
-            carPlate: "34 ABC 123",
-        },
-        {
-            id: "2",
-            senderId: "cust2",
-            receiverId: "mech1",
-            senderName: "Ayşe Kaya",
-            content: "Fren balata işi ne kadar sürer?",
-            timestamp: "13:15",
-            isRead: true,
-            senderType: 'customer',
-            carPlate: "06 XYZ 789",
-        }
-      ] as Message[],
-      offers: [
-        {
-            id: "1",
-            customerId: "cust3",
-            customerName: "Fatma Çelik",
-            carInfo: "2017 Ford Focus - 34 DEF 456",
-            problem: "Transmisyon arızası",
-            offeredPrice: "₺600",
-            location: "Üsküdar, İstanbul",
-            distance: "2.3 km",
-            urgency: "high",
-            time: "10 dk önce",
-            status: 'pending'
-        }
-      ] as Offer[],
-      reminders: [] as Reminder[],
+      // BAŞLANGIÇ VERİLERİ (SEED DATA)
+      customers: seedCustomers,
+      mechanics: seedMechanics,
+      cars: seedCars,
+      jobs: seedJobs,
+      reminders: seedReminders,
 
+      // --- EKLEME FONKSİYONLARI ---
       addCustomer: (customer) => set((state) => ({ 
         customers: [...state.customers, customer] 
       })),
 
-      updateCustomer: (id, updates) => set((state) => ({
-        customers: state.customers.map((c) => c.id === id ? { ...c, ...updates } : c)
+      addMechanic: (mechanic) => set((state) => ({ 
+        mechanics: [...state.mechanics, mechanic] 
       })),
 
-      addMechanic: (mechanic) => set((state) => ({
-        mechanics: [...state.mechanics, mechanic]
+      addCar: (car) => set((state) => ({ 
+        cars: [...state.cars, car] 
       })),
 
-      updateMechanic: (id, updates) => set((state) => ({
-        mechanics: state.mechanics.map((m) => m.id === id ? { ...m, ...updates } : m)
+      addJob: (job) => set((state) => ({ 
+        jobs: [...state.jobs, job] 
+      })),
+      
+      addReminder: (reminder) => set((state) => ({
+        reminders: [...state.reminders, reminder]
       })),
 
-      addJob: (job) => set((state) => ({
-        jobs: [...state.jobs, job]
-      })),
-
+      // --- GÜNCELLEME FONKSİYONLARI ---
+      
       updateJobStatus: (jobId, status) => set((state) => ({
         jobs: state.jobs.map((j) => j.id === jobId ? { ...j, status } : j)
       })),
 
-      rateMechanic: (mechanicId, rating) => set((state) => {
-        const mechanic = state.mechanics.find((m) => m.id === mechanicId);
-        if (!mechanic) return state;
+      updateCustomer: (id, updates) => set((state) => ({
+        customers: state.customers.map((c) => 
+          c.id === id ? { ...c, ...updates } : c
+        )
+      })),
 
-        const currentTotalScore = mechanic.rating * mechanic.reviewCount;
-        const newReviewCount = mechanic.reviewCount + 1;
-        const newRating = (currentTotalScore + rating) / newReviewCount;
+      updateMechanic: (id, updates) => set((state) => ({
+        mechanics: state.mechanics.map((m) => 
+          m.id === id ? { ...m, ...updates } : m
+        )
+      })),
 
-        // Round to 1 decimal place
-        const roundedRating = Math.round(newRating * 10) / 10;
+      // --- YENİ EKLENENLER ---
+      
+      removeCar: (carId) => set((state) => ({
+        cars: state.cars.filter((c) => c.id !== carId),
+        // Araca bağlı işleri ve hatırlatıcıları da temizlemek iyi olur ama MVP için zorunlu değil, 
+        // ancak tutarlılık için filtreleyelim:
+        jobs: state.jobs.filter((j) => j.carId !== carId),
+        reminders: state.reminders.filter((r) => r.carId !== carId)
+      })),
+
+      toggleReminder: (reminderId) => set((state) => ({
+        reminders: state.reminders.map((r) => 
+          r.id === reminderId ? { ...r, isCompleted: !r.isCompleted } : r
+        )
+      })),
+
+      rateJob: (jobId, rating, comment) => set((state) => {
+        // 1. İşi güncelle
+        const updatedJobs = state.jobs.map((j) => 
+          j.id === jobId 
+            ? { ...j, isRated: true, rating, reviewComment: comment } 
+            : j
+        );
+        
+        // 2. Tamirciyi bul ve puanını güncelle
+        const job = state.jobs.find((j) => j.id === jobId);
+        let updatedMechanics = state.mechanics;
+        
+        if (job) {
+          updatedMechanics = state.mechanics.map((m) => {
+            if (m.id === job.mechanicId) {
+              const newReviewCount = m.reviewCount + 1;
+              // Basit ortalama hesaplama: ((EskiOrt * EskiSayı) + YeniPuan) / YeniSayı
+              const newRating = ((m.rating * m.reviewCount) + rating) / newReviewCount;
+              return {
+                ...m,
+                reviewCount: newReviewCount,
+                rating: parseFloat(newRating.toFixed(1))
+              };
+            }
+            return m;
+          });
+        }
 
         return {
-          mechanics: state.mechanics.map((m) => 
-            m.id === mechanicId 
-              ? { ...m, rating: roundedRating, reviewCount: newReviewCount } 
-              : m
-          )
+          jobs: updatedJobs,
+          mechanics: updatedMechanics
         };
       }),
+
     }),
     {
-      name: 'data-storage',
+      name: 'tamircim-storage-v2', // Versiyon değiştirdiğinde cache temizlenir
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

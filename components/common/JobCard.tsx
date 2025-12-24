@@ -1,4 +1,4 @@
-import { ServiceRecord } from "@/types/schema";
+import { Job } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import {
@@ -10,11 +10,12 @@ import {
 } from "react-native";
 
 export interface JobCardProps {
-  job: ServiceRecord;
+  job: Job;
   displayContactName?: string;
   onPress?: () => void;
   onAcceptPress?: () => void;
   onRejectPress?: () => void;
+  onStartJobPress?: () => void;
   onCompletePress?: () => void;
   onCallCustomerPress?: () => void;
   onMessageCustomerPress?: () => void;
@@ -29,6 +30,7 @@ const JobCard: React.FC<JobCardProps> = ({
   onPress,
   onAcceptPress,
   onRejectPress,
+  onStartJobPress,
   onCompletePress,
   onCallCustomerPress,
   onMessageCustomerPress,
@@ -36,6 +38,7 @@ const JobCard: React.FC<JobCardProps> = ({
   showActions = true,
   style,
   progress = 0,
+  displayContactName,
 }) => {
   const getCardStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
@@ -67,7 +70,7 @@ const JobCard: React.FC<JobCardProps> = ({
     return baseStyle;
   };
 
-  const getStatusColor = (status: ServiceRecord["status"]): string => {
+  const getStatusColor = (status: Job["status"]): string => {
     switch (status) {
       case "pending":
         return "#FF9500";
@@ -85,7 +88,7 @@ const JobCard: React.FC<JobCardProps> = ({
     }
   };
 
-  const getStatusText = (status: ServiceRecord["status"]): string => {
+  const getStatusText = (status: Job["status"]): string => {
     switch (status) {
       case "pending":
         return "Bekliyor";
@@ -131,19 +134,57 @@ const JobCard: React.FC<JobCardProps> = ({
   const renderCustomerInfo = () => {
     if (variant === "compact") return null;
 
+    // Tamamlanma tarihi varsa onu, yoksa oluşturulma tarihini göster
+    const dateToShow =
+      job.status === "completed" && job.completedAt
+        ? job.completedAt
+        : job.createdAt;
+    const dateLabel = job.status === "completed" ? "Bitiş:" : "Tarih:";
+
     return (
       <View style={styles.customerContainer}>
-        <View style={styles.customerRow}>
-          <Ionicons name="person" size={16} color="#6C757D" />
-          <Text style={styles.customerText}>
-            {job.mechanicName || "Müşteri Bilgisi Yok"}
-          </Text>
-        </View>
+        {displayContactName && (
+          <View style={styles.customerRow}>
+            <Ionicons name="person" size={16} color="#6C757D" />
+            <Text style={styles.customerText}>{displayContactName}</Text>
+          </View>
+        )}
 
         <View style={styles.customerRow}>
           <Ionicons name="calendar" size={16} color="#6C757D" />
-          <Text style={styles.customerText}>{formatDate(job.date)}</Text>
+          <Text style={styles.customerText}>
+            {dateLabel} {formatDate(dateToShow)}
+          </Text>
         </View>
+
+        {/* Kategori Bilgisi */}
+        <View style={styles.customerRow}>
+          <Ionicons name="construct" size={16} color="#6C757D" />
+          <Text style={styles.customerText}>{job.categoryId}</Text>
+        </View>
+
+        {/* Müşteri Notu (Bekleyen/Devam Eden) */}
+        {(job.status === "pending" ||
+          job.status === "accepted" ||
+          job.status === "in_progress") &&
+          job.customerNote && (
+            <View style={styles.noteContainer}>
+              <Text style={styles.noteLabel}>Müşteri Notu:</Text>
+              <Text style={styles.noteText} numberOfLines={3}>
+                {job.customerNote}
+              </Text>
+            </View>
+          )}
+
+        {/* Tamirci Açıklaması (Tamamlanan) */}
+        {job.status === "completed" && job.workDescription && (
+          <View style={styles.noteContainer}>
+            <Text style={styles.noteLabel}>Yapılan İşlem:</Text>
+            <Text style={styles.noteText} numberOfLines={3}>
+              {job.workDescription}
+            </Text>
+          </View>
+        )}
       </View>
     );
   };
@@ -181,11 +222,12 @@ const JobCard: React.FC<JobCardProps> = ({
           >
             <Ionicons name="call" size={18} color="#FFF" />
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.actionButton, styles.messageButton]}
-            onPress={onMessageCustomerPress}
+            style={[styles.actionButton, styles.acceptButton]}
+            onPress={onStartJobPress}
           >
-            <Ionicons name="chatbubble" size={18} color="#FFF" />
+            <Text style={styles.actionButtonText}>İşe Başla</Text>
           </TouchableOpacity>
         </View>
       );
@@ -194,6 +236,13 @@ const JobCard: React.FC<JobCardProps> = ({
     if (job.status === "in_progress") {
       return (
         <View style={styles.actionContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.callButton]}
+            onPress={onCallCustomerPress}
+          >
+            <Ionicons name="call" size={18} color="#FFF" />
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.actionButton, styles.completeButton]}
             onPress={onCompletePress}
@@ -222,14 +271,16 @@ const JobCard: React.FC<JobCardProps> = ({
         </View>
 
         <Text style={styles.description} numberOfLines={2}>
-          {job.description}
+          {job.customerNote || "Açıklama yok."}
         </Text>
 
         {renderCustomerInfo()}
 
-        <View style={styles.footer}>
-          <Text style={styles.price}>{job.cost} ₺</Text>
-        </View>
+        {job.cost && (
+          <View style={styles.footer}>
+            <Text style={styles.price}>{job.cost} ₺</Text>
+          </View>
+        )}
 
         {renderActions()}
       </View>
@@ -287,6 +338,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#495057",
     marginLeft: 8,
+  },
+  noteContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#E9ECEF",
+  },
+  noteLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#495057",
+    marginBottom: 2,
+  },
+  noteText: {
+    fontSize: 13,
+    color: "#212529",
+    fontStyle: "italic",
   },
   footer: {
     flexDirection: "row",

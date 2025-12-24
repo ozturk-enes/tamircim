@@ -1,12 +1,15 @@
 import MechanicCardList from "@/components/shared/MechanicCardList";
 import SearchBar from "@/components/shared/SearchBar";
 import Colors from "@/constants/Colors";
-import { cars, customers, mechanics } from "@/constants/mockData";
-import type { Car, Customer } from "@/types/schema";
+import { useAuthStore } from "@/store/authStore";
+import { useDataStore } from "@/store/dataStore";
+import { Car, Customer, Job } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
+import * as Location from "expo-location";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -23,50 +26,156 @@ import {
 
 const { width } = Dimensions.get("window");
 
-// Enhanced mechanic data with additional details
-const mechanicsWithDetails = mechanics.map((mechanic, index) => ({
-  ...mechanic,
-  distance: (Math.random() * 10 + 0.5).toFixed(1), // Distance 0.5-10.5 km
-  completedJobs: Math.floor(Math.random() * 100 + 20), // 20-120 completed jobs
-  responseTime: Math.floor(Math.random() * 30 + 5), // 5-35 minutes response time
-  serviceTitle: mechanic.specialties[0] + " Uzmanı", // Primary service title
-  experience: Math.floor(Math.random() * 15 + 2) + " yıl", // 2-17 years experience
-  averageResponseTime: Math.floor(Math.random() * 60 + 15) + " dk", // 15-75 minutes
-  // Add missing properties that were expected by the component but might not be in Mechanic type
-  priceRange: "₺500 - ₺5000", // Mock price range
-  location: { ...mechanic.location, address: mechanic.address }, // Ensure address is accessible
-}));
+// Mock User Location (İstanbul Merkezi) - Fallback
+const DEFAULT_LOCATION = { latitude: 41.0082, longitude: 28.9784 };
+
+// Mesafe Hesaplama (Haversine Formülü)
+const calculateDistance = (
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+) => {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return "0.0";
+
+  const R = 6371; // Dünya yarıçapı (km)
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return (R * c).toFixed(1);
+};
+
+// Deneyim Yılı Hesaplama
+const calculateExperience = (createdAt: string) => {
+  if (!createdAt) return 0;
+  const createdYear = new Date(createdAt).getFullYear();
+  const currentYear = new Date().getFullYear();
+
+  // 2025'ten sonra açılan hesaplar için 0
+  if (createdYear > 2025) return 0;
+
+  const diff = currentYear - createdYear;
+  return diff > 0 ? diff : 0;
+};
+
+// Çalışma Saati Kontrolü
+const checkWorkingStatus = (workingHours: string) => {
+  try {
+    // Örnek format: "08:00 - 19:00" veya "08:00-19:00"
+    const parts = workingHours.split("-");
+    if (parts.length !== 2) return false;
+
+    const [start, end] = parts.map((t) => t.trim());
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTotalMinutes = currentHour * 60 + currentMinute;
+
+    const [startHour, startMinute] = start.split(":").map(Number);
+    const [endHour, endMinute] = end.split(":").map(Number);
+
+    const startTotalMinutes = startHour * 60 + (startMinute || 0);
+    const endTotalMinutes = endHour * 60 + (endMinute || 0);
+
+    return (
+      currentTotalMinutes >= startTotalMinutes &&
+      currentTotalMinutes <= endTotalMinutes
+    );
+  } catch (e) {
+    console.error("Working hours parse error:", e);
+    return false;
+  }
+};
 
 export default function CustomerHomeScreen() {
+  // STORE ENTEGRASYONU
+  const currentUser = useAuthStore((state) => state.user) as Customer;
+  const allMechanics = useDataStore((state) => state.mechanics);
+  const allCars = useDataStore((state) => state.cars);
+  const allJobs = useDataStore((state) => state.jobs);
+  const addJob = useDataStore((state) => state.addJob);
+
+  // Kullanıcının arabalarını filtrele
+  const userCars = useMemo(
+    () => allCars.filter((c) => c.ownerId === currentUser?.id),
+    [allCars, currentUser?.id]
+  );
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("Tümü");
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedMechanic, setSelectedMechanic] = useState<any>(null);
   const [modalAnimation] = useState(new Animated.Value(0));
 
-  const currentUser: Customer = customers[0];
-  const userCars = cars.filter((c) => c.ownerId === currentUser.id);
+  // Location & Sorting State
+  const [location, setLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<"name" | "distance" | "rating" | null>(
+    null
+  );
+  const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [callingMechanicId, setCallingMechanicId] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setErrorMsg("Konum izni reddedildi");
+          return;
+        }
+
+        let currentLocation = await Location.getCurrentPositionAsync({});
+        setLocation(currentLocation.coords);
+      } catch (error) {
+        setErrorMsg("Konum alınamadı");
+      }
+    })();
+  }, []);
 
   const [appointmentVisible, setAppointmentVisible] = useState(false);
   const [selectedCarId, setSelectedCarId] = useState<string | null>(
-    userCars[0]?.id ?? null
+    userCars.length > 0 ? userCars[0].id : null
   );
   const [appointmentNote, setAppointmentNote] = useState("");
 
+  // Check if there is a pending job for the selected mechanic
+  const hasPendingRequest = useMemo(() => {
+    if (!selectedMechanic || !currentUser) return false;
+    return allJobs.some(
+      (job) =>
+        job.mechanicId === selectedMechanic.id &&
+        job.customerId === currentUser.id &&
+        job.status === "pending"
+    );
+  }, [allJobs, selectedMechanic, currentUser]);
+
+  // Kategori Listesi (UI Filtreleme İçin)
   const categories = [
     "Tümü",
     "Periyodik Bakım",
     "Motor",
     "Oto Elektrik",
-    "Kaporta & Boya",
-    "Fren Sistemi",
+    "Kaporta", // Schema'daki isimle eşleşmeli
+    "Fren", // Schema'daki isimle eşleşmeli
     "Şanzıman",
-    "Oto Lastik & Jant",
-    "Klima",
+    "Lastik", // Schema'daki isimle eşleşmeli
+    "Klima", // Schema'daki isimle eşleşmeli
     "Ekspertiz",
     "Çekici",
     "Egzoz",
-    "Akü",
+    "Akü", // Schema'daki isimle eşleşmeli
     "Oto Yıkama & Kuaför",
     "Cam & Kilit",
     "Döşeme",
@@ -75,18 +184,79 @@ export default function CustomerHomeScreen() {
     "Diğer",
   ];
 
-  const filteredMechanics = mechanicsWithDetails.filter((mechanic) => {
-    const matchesSearch =
-      mechanic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      mechanic.specialties.some((spec) =>
-        spec.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-    const matchesCategory =
-      selectedCategory === "Tümü" ||
-      mechanic.specialties.includes(selectedCategory as any);
+  // Tamirci verilerini zenginleştir (Gerçekçi Mock Data ve Mesafe Hesaplama)
+  const mechanicsWithDetails = useMemo(() => {
+    const userLat = location?.latitude || DEFAULT_LOCATION.latitude;
+    const userLon = location?.longitude || DEFAULT_LOCATION.longitude;
 
-    return matchesSearch && matchesCategory;
-  });
+    return allMechanics.map((mechanic) => {
+      const calculatedDistance = calculateDistance(
+        userLat,
+        userLon,
+        mechanic.location.latitude,
+        mechanic.location.longitude
+      );
+
+      // İş Sayısı Hesaplama
+      const completedJobCount = allJobs.filter(
+        (j) => j.mechanicId === mechanic.id && j.status === "completed"
+      ).length;
+      const totalCompletedJobs =
+        (mechanic.completedJobs || 0) + completedJobCount;
+
+      // Deneyim Yılı
+      const experienceYears = calculateExperience(mechanic.createdAt || "");
+
+      return {
+        ...mechanic,
+        distance: calculatedDistance, // Gerçek hesaplanan mesafe
+        completedJobs: totalCompletedJobs,
+        completedJobsLabel:
+          totalCompletedJobs > 0 ? `${totalCompletedJobs}  iş` : "0",
+        responseTime: 15,
+        serviceTitle: (mechanic.specialties[0] || "Genel") + " Uzmanı",
+        experience: `${experienceYears} yıllık deneyim`,
+        experienceLabel:
+          experienceYears > 0
+            ? `${experienceYears} yıllık deneyim`
+            : "0 yıllık deneyim",
+        averageResponseTime: "30 dk",
+        priceRange: mechanic.priceRange || "₺500 - ₺5000",
+      };
+    });
+  }, [allMechanics, allJobs, location]);
+
+  const filteredMechanics = useMemo(() => {
+    let result = mechanicsWithDetails.filter((mechanic) => {
+      const matchesSearch =
+        mechanic.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        mechanic.specialties.some((spec) =>
+          spec.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+      const matchesCategory =
+        selectedCategory === "Tümü" ||
+        mechanic.specialties.includes(selectedCategory as any);
+
+      return matchesSearch && matchesCategory;
+    });
+
+    // Sıralama
+    if (sortBy) {
+      result.sort((a, b) => {
+        if (sortBy === "name") {
+          return a.name.localeCompare(b.name);
+        } else if (sortBy === "distance") {
+          return parseFloat(a.distance) - parseFloat(b.distance);
+        } else if (sortBy === "rating") {
+          return b.rating - a.rating;
+        }
+        return 0;
+      });
+    }
+
+    return result;
+  }, [mechanicsWithDetails, searchQuery, selectedCategory, sortBy]);
 
   const openModal = (mechanic: any) => {
     setSelectedMechanic(mechanic);
@@ -111,23 +281,52 @@ export default function CustomerHomeScreen() {
     });
   };
 
-  const handlePhoneCall = (phoneNumber: string) => {
-    const phoneUrl = `tel:${phoneNumber}`;
-    Linking.canOpenURL(phoneUrl)
-      .then((supported) => {
-        if (supported) {
-          return Linking.openURL(phoneUrl);
-        } else {
-          Alert.alert("Hata", "Telefon uygulaması açılamıyor");
-        }
-      })
-      .catch((err) => {
-        console.error("Phone call error:", err);
-        Alert.alert("Hata", "Arama yapılırken bir hata oluştu");
-      });
+  const handlePhoneCall = async (phoneNumber: string, mechanicId?: string) => {
+    if (mechanicId) setCallingMechanicId(mechanicId);
+
+    try {
+      // 1. Numara Kontrolü
+      if (!phoneNumber) {
+        Alert.alert("Hata", "Geçerli bir telefon numarası bulunamadı.");
+        if (mechanicId) setCallingMechanicId(null);
+        return;
+      }
+
+      // 2. Numara Formatlama
+      const cleanedNumber = phoneNumber.replace(/[^\d+]/g, "");
+      const phoneUrl = `tel:${cleanedNumber}`;
+
+      // 3. Platform ve Destek Kontrolü
+      const supported = await Linking.canOpenURL(phoneUrl);
+
+      if (supported) {
+        // Geri bildirim (Toast veya Alert yerine doğrudan arama, ancak loading gösteriyoruz)
+        await Linking.openURL(phoneUrl);
+      } else {
+        // Fallback: Numara Kopyalama veya Gösterme
+        Alert.alert(
+          "Arama Başlatılamadı",
+          `Cihazınız bu aramayı gerçekleştiremiyor. Numara: ${phoneNumber}`,
+          [{ text: "Tamam", style: "cancel" }]
+        );
+      }
+    } catch (error) {
+      console.error("Phone call error:", error);
+      Alert.alert("Hata", "Arama başlatılırken bir sorun oluştu.");
+    } finally {
+      if (mechanicId) setCallingMechanicId(null);
+    }
   };
 
   const handleAppointment = () => {
+    if (userCars.length === 0) {
+      Alert.alert(
+        "Araç Yok",
+        "Randevu almadan önce lütfen profilinizden bir araç ekleyin.",
+        [{ text: "Tamam" }]
+      );
+      return;
+    }
     setAppointmentVisible(true);
   };
 
@@ -137,30 +336,40 @@ export default function CustomerHomeScreen() {
       !selectedCarId ||
       appointmentNote.trim().length === 0
     ) {
-      Alert.alert("Eksik Bilgi", "Araç ve randevu nedeni gerekli.");
+      Alert.alert(
+        "Eksik Bilgi",
+        "Lütfen bir araç seçin ve sorunu kısaca açıklayın."
+      );
       return;
     }
-    const newJob: any = {
-      id: String(Date.now()),
-      carId: selectedCarId,
+
+    // YENİ: Gerçek Job (İş) Kaydı Oluşturma
+    const newJob: Job = {
+      id: Date.now().toString(),
+      customerId: currentUser.id,
       mechanicId: selectedMechanic.id,
-      mechanicName: selectedMechanic.name,
-      date: new Date().toISOString(),
+      carId: selectedCarId,
+      categoryId: selectedMechanic.specialties[0] || "Periyodik Bakım",
       title: "Randevu Talebi",
-      description: appointmentNote.trim(),
-      cost: 0,
+      customerNote: appointmentNote.trim(),
       status: "pending",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      appointmentDate: new Date(Date.now() + 86400000).toISOString(), // Varsayılan: Yarın
+      isRated: false,
     };
-    // Mock service records array for demonstration
-    if (!(globalThis as any).serviceRecords) {
-      (globalThis as any).serviceRecords = [];
-    }
-    ((globalThis as any).serviceRecords as any[]).push(newJob);
+
+    // Store'a ekle
+    addJob(newJob);
+
     setAppointmentVisible(false);
     setAppointmentNote("");
-    Alert.alert("Randevu Talebi", "Talebiniz oluşturuldu (Bekleniyor).", [
-      { text: "Tamam" },
-    ]);
+
+    Alert.alert(
+      "Randevu Talebi",
+      "Talebiniz başarıyla oluşturuldu ve tamirciye iletildi.",
+      [{ text: "Tamam" }]
+    );
   };
 
   const renderMechanicCard = ({ item }: { item: any }) => (
@@ -198,11 +407,18 @@ export default function CustomerHomeScreen() {
           {/* Phone Number */}
           <TouchableOpacity
             style={styles.phoneContainer}
-            onPress={() => handlePhoneCall(item.phone)}
+            onPress={() => handlePhoneCall(item.phone, item.id)}
             activeOpacity={0.7}
+            disabled={callingMechanicId === item.id}
           >
-            <Ionicons name="call" size={14} color={Colors.light.primary} />
-            <Text style={styles.phoneText}>{item.phone}</Text>
+            {callingMechanicId === item.id ? (
+              <ActivityIndicator size="small" color={Colors.light.primary} />
+            ) : (
+              <>
+                <Ionicons name="call" size={14} color={Colors.light.primary} />
+                <Text style={styles.phoneText}>{item.phone}</Text>
+              </>
+            )}
           </TouchableOpacity>
 
           {/* Address */}
@@ -264,7 +480,7 @@ export default function CustomerHomeScreen() {
               size={12}
               color={Colors.light.success}
             />
-            <Text style={styles.statText}>{item.completedJobs} iş</Text>
+            <Text style={styles.statText}>{item.completedJobsLabel}</Text>
           </View>
         </View>
         <TouchableOpacity
@@ -322,7 +538,10 @@ export default function CustomerHomeScreen() {
           <Text style={styles.listTitle}>
             Tamirciler ({filteredMechanics.length})
           </Text>
-          <TouchableOpacity style={styles.sortButton}>
+          <TouchableOpacity
+            style={styles.sortButton}
+            onPress={() => setSortModalVisible(true)}
+          >
             <Ionicons name="funnel" size={16} color={Colors.light.primary} />
             <Text style={styles.sortText}>Sırala</Text>
           </TouchableOpacity>
@@ -347,6 +566,106 @@ export default function CustomerHomeScreen() {
           />
         )}
       </View>
+
+      {/* Sort Modal */}
+      <Modal
+        visible={sortModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSortModalVisible(false)}
+        statusBarTranslucent={true}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSortModalVisible(false)}
+        >
+          <View style={[styles.modalContent, styles.sortModalContent]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Sıralama Seçenekleri</Text>
+              <TouchableOpacity onPress={() => setSortModalVisible(false)}>
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={Colors.light.tabIconDefault}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.sortOption}
+              onPress={() => {
+                setSortBy("name");
+                setSortModalVisible(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.sortOptionText,
+                  sortBy === "name" && styles.sortOptionActive,
+                ]}
+              >
+                A'dan Z'ye (İsim)
+              </Text>
+              {sortBy === "name" && (
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={Colors.light.primary}
+                />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sortOption}
+              onPress={() => {
+                setSortBy("distance");
+                setSortModalVisible(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.sortOptionText,
+                  sortBy === "distance" && styles.sortOptionActive,
+                ]}
+              >
+                En Yakın Konum
+              </Text>
+              {sortBy === "distance" && (
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={Colors.light.primary}
+                />
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.sortOption}
+              onPress={() => {
+                setSortBy("rating");
+                setSortModalVisible(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.sortOptionText,
+                  sortBy === "rating" && styles.sortOptionActive,
+                ]}
+              >
+                En Yüksek Puan
+              </Text>
+              {sortBy === "rating" && (
+                <Ionicons
+                  name="checkmark"
+                  size={20}
+                  color={Colors.light.primary}
+                />
+              )}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Enhanced Modal */}
       <Modal
@@ -401,14 +720,14 @@ export default function CustomerHomeScreen() {
                     style={[
                       styles.modalOnlineIndicator,
                       {
-                        backgroundColor: selectedMechanic.isOnline
+                        backgroundColor: (selectedMechanic as any).isOpen
                           ? Colors.light.success
                           : Colors.light.tabIconDefault,
                       },
                     ]}
                   >
                     <Text style={styles.onlineText}>
-                      {selectedMechanic.isOnline ? "Çevrimiçi" : "Çevrimdışı"}
+                      {(selectedMechanic as any).isOpen ? "Açık" : "Kapalı"}
                     </Text>
                   </View>
                 </View>
@@ -453,7 +772,8 @@ export default function CustomerHomeScreen() {
                     />
                     <Text style={styles.detailLabel}>Adres</Text>
                     <Text style={styles.detailValue}>
-                      {selectedMechanic.location.address}
+                      {selectedMechanic.location.address ||
+                        selectedMechanic.address}
                     </Text>
                   </View>
                   <View style={styles.detailItem}>
@@ -497,14 +817,30 @@ export default function CustomerHomeScreen() {
                 {/* Action Buttons */}
                 <View style={styles.modalActions}>
                   <TouchableOpacity
-                    style={styles.appointmentButton}
+                    style={[
+                      styles.appointmentButton,
+                      hasPendingRequest && styles.appointmentButtonDisabled,
+                    ]}
                     onPress={handleAppointment}
                     activeOpacity={0.8}
+                    disabled={hasPendingRequest}
                     accessible={true}
                     accessibilityLabel="Randevu al"
                   >
-                    <Ionicons name="calendar" size={20} color="white" />
-                    <Text style={styles.appointmentButtonText}>Randevu Al</Text>
+                    <Ionicons
+                      name={hasPendingRequest ? "time" : "calendar"}
+                      size={20}
+                      color={hasPendingRequest ? "#666" : "white"}
+                    />
+                    <Text
+                      style={[
+                        styles.appointmentButtonText,
+                        hasPendingRequest &&
+                          styles.appointmentButtonTextDisabled,
+                      ]}
+                    >
+                      {hasPendingRequest ? "Beklemede" : "Randevu Al"}
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.callButton}
@@ -590,7 +926,7 @@ export default function CustomerHomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: "#F5F9FF", // Modern light blue background
   },
   header: {
     paddingHorizontal: 20,
@@ -625,7 +961,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: Colors.light.background,
+    backgroundColor: "transparent",
   },
   searchBar: {
     flexDirection: "row",
@@ -633,15 +969,15 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
@@ -651,28 +987,38 @@ const styles = StyleSheet.create({
   },
   categoryContainer: {
     paddingVertical: 8,
-    backgroundColor: Colors.light.background,
+    backgroundColor: "transparent",
   },
   categoryContent: {
     paddingHorizontal: 20,
   },
   categoryChip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 10,
     marginRight: 12,
     backgroundColor: "white",
-    borderRadius: 20,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: Colors.light.lightGray,
+    borderColor: "transparent",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   categoryChipActive: {
     backgroundColor: Colors.light.primary,
     borderColor: Colors.light.primary,
+    shadowColor: Colors.light.primary,
+    shadowOpacity: 0.3,
   },
   categoryText: {
     fontSize: 14,
     color: Colors.light.text,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   categoryTextActive: {
     color: "white",
@@ -686,6 +1032,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 16,
+    marginTop: 8,
   },
   listTitle: {
     fontSize: 18,
@@ -698,15 +1045,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: "white",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.light.primary,
+    borderRadius: 12,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   sortText: {
     fontSize: 14,
     color: Colors.light.primary,
     marginLeft: 4,
-    fontWeight: "500",
+    fontWeight: "600",
   },
   listContent: {
     paddingBottom: 20,
@@ -714,19 +1067,19 @@ const styles = StyleSheet.create({
   // Enhanced Mechanic Card Styles
   mechanicCard: {
     backgroundColor: "white",
-    borderRadius: 16,
+    borderRadius: 24,
     padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
+    marginBottom: 16,
+    shadowColor: "#1E88E5",
     shadowOffset: {
       width: 0,
-      height: 3,
+      height: 8,
     },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 6,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.05)",
+    borderColor: "rgba(255,255,255,1)",
   },
   serviceHeader: {
     flexDirection: "row",
@@ -877,6 +1230,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
+  },
+  statusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   emptyState: {
     alignItems: "center",
@@ -1066,11 +1428,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
+  appointmentButtonDisabled: {
+    backgroundColor: "#E0E0E0",
+  },
   appointmentButtonText: {
     fontSize: 16,
     fontWeight: "600",
     color: "white",
     marginLeft: 8,
+  },
+  appointmentButtonTextDisabled: {
+    color: "#666",
   },
   callButton: {
     flex: 1,
@@ -1152,5 +1520,31 @@ const styles = StyleSheet.create({
   appointmentSubmitText: {
     color: "white",
     fontWeight: "700",
+  },
+  // Sort Modal Styles
+  sortModalContent: {
+    width: "80%",
+    padding: 20,
+    backgroundColor: "white",
+    borderRadius: 20,
+    alignItems: "stretch",
+    alignSelf: "center",
+  },
+  sortOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  sortOptionText: {
+    fontSize: 16,
+    color: Colors.light.text,
+    fontWeight: "500",
+  },
+  sortOptionActive: {
+    color: Colors.light.primary,
+    fontWeight: "bold",
   },
 });

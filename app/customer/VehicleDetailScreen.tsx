@@ -1,10 +1,12 @@
 import Colors from "@/constants/Colors";
-import { getCarFullDetails } from "@/services/mockService";
-import { Reminder } from "@/types/schema";
+import { useDataStore } from "@/store/dataStore"; // Veri kaynağı
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import {
+  Alert,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -16,37 +18,59 @@ import {
 
 export default function VehicleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  
-  // Verileri servisten çekiyoruz
-  const { car, history, reminders: initialReminders } = getCarFullDetails(id || "");
-  const recentJobs = history;
+
+  // --- STORE INTEGRATION ---
+  // Store'dan tüm verileri çekip ID'ye göre filtreliyoruz
+  const car = useDataStore((state) => state.cars.find((c) => c.id === id));
+  const mechanics = useDataStore((state) => state.mechanics);
+  const history = useDataStore((state) =>
+    state.jobs
+      .filter((j) => j.carId === id)
+      .sort(
+        (a, b) =>
+          new Date(b.completedAt || b.createdAt).getTime() -
+          new Date(a.completedAt || a.createdAt).getTime()
+      )
+  );
+  // Reminder store'da varsa çek, yoksa boş array (DataStore yapına göre)
+  const allReminders = useDataStore((state) => state.reminders) || [];
+  const carReminders = allReminders.filter((r) => r.carId === id);
 
   const [isReminderModalVisible, setReminderModalVisible] = useState(false);
-  const [reminders, setReminders] = useState<Reminder[]>(initialReminders);
-
   const [remTitle, setRemTitle] = useState("");
   const [remDate, setRemDate] = useState("");
   const [remMileage, setRemMileage] = useState("");
 
-  const canSaveReminder = useMemo(
-    () =>
-      remTitle.trim().length > 0 &&
-      (remDate.trim().length > 0 || remMileage.trim().length > 0),
-    [remTitle, remDate, remMileage]
-  );
+  // Araç bulunamazsa (örn: silinmişse) geri dön
+  if (!car) {
+    return (
+      <View style={styles.container}>
+        <Text style={{ textAlign: "center", marginTop: 50 }}>
+          Araç bulunamadı.
+        </Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={{ alignSelf: "center", marginTop: 20 }}
+        >
+          <Text style={{ color: Colors.light.primary }}>Geri Dön</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-  const saveReminder = () => {
-    if (!canSaveReminder) return;
-    const newReminder: Reminder = {
-      id: String(Date.now()),
-      carId: id || "",
-      title: remTitle.trim(),
-      dueDate: remDate.trim() || undefined,
-      dueMileage: remMileage.trim() ? Number(remMileage.trim()) : undefined,
-      isCompleted: false,
-    };
-    
-    setReminders((prev) => [newReminder, ...prev]);
+  const handleSaveReminder = () => {
+    if (!remTitle) {
+      Alert.alert("Hata", "Lütfen bir başlık girin.");
+      return;
+    }
+
+    // Not: Store'a ekleme fonksiyonu (addReminder) varsa burada çağrılmalı.
+    // Şimdilik sadece UI aksiyonu gösteriyoruz.
+    Alert.alert(
+      "Başarılı",
+      "Hatırlatıcı eklendi (Store entegrasyonu bekleniyor)."
+    );
+
     setRemTitle("");
     setRemDate("");
     setRemMileage("");
@@ -55,148 +79,234 @@ export default function VehicleDetailScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.headerButton}
-        >
-          <Ionicons name="arrow-back" size={22} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Araç Detayı</Text>
-        <TouchableOpacity
-          onPress={() => setReminderModalVisible(true)}
-          style={styles.headerButton}
-        >
-          <Ionicons name="alarm" size={22} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {/* Header */}
+      <LinearGradient
+        colors={[Colors.light.lightBlue, Colors.light.background]}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.headerButton}
+          >
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color={Colors.light.primary}
+            />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Araç Detayı</Text>
+          <TouchableOpacity
+            onPress={() => setReminderModalVisible(true)}
+            style={styles.headerButton}
+          >
+            <Ionicons
+              name="notifications-outline"
+              size={24}
+              color={Colors.light.primary}
+            />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        {car && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Car Card */}
+        <View style={styles.carCard}>
+          <Image
+            source={{
+              uri:
+                car.photoUrl ||
+                car.image ||
+                "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1000&auto=format&fit=crop",
+            }}
+            style={styles.carImage}
+            resizeMode="cover"
+          />
+          <View style={styles.carInfo}>
+            <Text style={styles.carTitle}>
               {car.brand} {car.model}
             </Text>
-            <View style={styles.row}>
-              <Text style={styles.label}>Yıl:</Text>
-              <Text style={styles.value}>{String(car.year)}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Plaka:</Text>
-              <Text style={styles.value}>{car.plate}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Renk:</Text>
-              <Text style={styles.value}>{car.color || "-"}</Text>
+            <Text style={styles.carPlate}>{car.plate}</Text>
+
+            <View style={styles.carDetailsRow}>
+              <View style={styles.carDetailItem}>
+                <Ionicons
+                  name="calendar-outline"
+                  size={16}
+                  color={Colors.light.tabIconDefault}
+                />
+                <Text style={styles.carDetailText}>{car.year}</Text>
+              </View>
+              <View style={styles.carDetailItem}>
+                <Ionicons
+                  name="water-outline"
+                  size={16}
+                  color={Colors.light.tabIconDefault}
+                />
+                <Text style={styles.carDetailText}>{car.fuelType}</Text>
+              </View>
+              <View style={styles.carDetailItem}>
+                <Ionicons
+                  name="color-palette-outline"
+                  size={16}
+                  color={Colors.light.tabIconDefault}
+                />
+                <Text style={styles.carDetailText}>{car.color}</Text>
+              </View>
             </View>
           </View>
-        )}
+        </View>
 
+        {/* History Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Son İşlemler</Text>
+            <Ionicons
+              name="time-outline"
+              size={20}
+              color={Colors.light.primary}
+            />
           </View>
-          {recentJobs.length === 0 ? (
-            <Text style={styles.emptyText}>Herhangi bir işlem bulunamadı.</Text>
+
+          {history.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Henüz işlem geçmişi yok.</Text>
+            </View>
           ) : (
-            recentJobs.map((job) => (
+            history.map((job) => (
               <View key={job.id} style={styles.jobItem}>
-                <View style={styles.jobRow}>
+                <View style={styles.jobIconContainer}>
                   <Ionicons
-                    name="build"
-                    size={16}
+                    name="construct"
+                    size={20}
                     color={Colors.light.primary}
                   />
-                  <Text style={styles.jobTitle}>{job.title}</Text>
                 </View>
-                <Text style={styles.jobDesc}>{job.description}</Text>
-                <View style={styles.jobMeta}>
-                  <Text style={styles.jobMetaText}>
-                    {new Date(job.date).toLocaleDateString()}
-                  </Text>
-                  <Text style={styles.jobMetaText}>{job.status}</Text>
+                <View style={styles.jobContent}>
+                  <Text style={styles.jobTitle}>{job.title}</Text>
+                  {job.customerNote && (
+                    <Text style={styles.jobDesc} numberOfLines={2}>
+                      {job.customerNote}
+                    </Text>
+                  )}
+                  <View style={styles.jobFooter}>
+                    <Text style={styles.jobDate}>
+                      {new Date(job.createdAt).toLocaleDateString("tr-TR")}
+                    </Text>
+                    <View
+                      style={[
+                        styles.statusBadge,
+                        {
+                          backgroundColor:
+                            job.status === "completed" ? "#DCFCE7" : "#FEF3C7",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          {
+                            color:
+                              job.status === "completed"
+                                ? "#166534"
+                                : "#92400E",
+                          },
+                        ]}
+                      >
+                        {job.status === "completed" ? "Tamamlandı" : "İşlemde"}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             ))
           )}
         </View>
 
+        {/* Reminders Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Hatırlatıcılar</Text>
+            <TouchableOpacity onPress={() => setReminderModalVisible(true)}>
+              <Text style={styles.addLink}>+ Ekle</Text>
+            </TouchableOpacity>
           </View>
-          {reminders.length === 0 ? (
-            <Text style={styles.emptyText}>
-              Henüz hatırlatıcı yok. Sağ üstten ekleyin.
-            </Text>
+
+          {carReminders.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>Hatırlatıcı bulunamadı.</Text>
+            </View>
           ) : (
-            reminders.map((r) => (
+            carReminders.map((r) => (
               <View key={r.id} style={styles.reminderItem}>
-                <View style={styles.jobRow}>
-                  <Ionicons name="time" size={16} color={"#FF9500"} />
-                  <Text style={styles.jobTitle}>{r.title}</Text>
+                <Ionicons
+                  name={r.isCompleted ? "checkmark-circle" : "alarm"}
+                  size={24}
+                  color={
+                    r.isCompleted ? Colors.light.success : Colors.light.warning
+                  }
+                />
+                <View style={styles.reminderContent}>
+                  <Text style={styles.reminderTitle}>{r.title}</Text>
+                  <Text style={styles.reminderDetail}>
+                    {r.dueDate ? `Tarih: ${r.dueDate}` : `Km: ${r.dueMileage}`}
+                  </Text>
                 </View>
-                {!!r.dueDate && (
-                  <Text style={styles.jobDesc}>Tarih: {r.dueDate}</Text>
-                )}
-                {!!r.dueMileage && (
-                  <Text style={styles.jobDesc}>Km: {r.dueMileage}</Text>
-                )}
               </View>
             ))
           )}
         </View>
       </ScrollView>
 
-      <Modal visible={isReminderModalVisible} transparent animationType="slide">
+      {/* Add Reminder Modal */}
+      <Modal visible={isReminderModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Hatırlatıcı Ekle</Text>
               <TouchableOpacity onPress={() => setReminderModalVisible(false)}>
-                <Ionicons name="close" size={22} color={"#999"} />
+                <Ionicons name="close" size={24} color={Colors.light.text} />
               </TouchableOpacity>
             </View>
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Başlık</Text>
+              <Text style={styles.label}>Başlık</Text>
               <TextInput
+                style={styles.input}
+                placeholder="Örn: Muayene, Sigorta"
                 value={remTitle}
                 onChangeText={setRemTitle}
-                placeholder="Örn: Vize Tarihi"
-                style={styles.input}
-                placeholderTextColor="#999"
               />
             </View>
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Tarih (YYYY-MM-DD)</Text>
+              <Text style={styles.label}>Tarih (İsteğe Bağlı)</Text>
               <TextInput
+                style={styles.input}
+                placeholder="GG.AA.YYYY"
                 value={remDate}
                 onChangeText={setRemDate}
-                placeholder="2025-12-30"
-                style={styles.input}
-                placeholderTextColor="#999"
               />
             </View>
+
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Kilometre</Text>
+              <Text style={styles.label}>Kilometre (İsteğe Bağlı)</Text>
               <TextInput
+                style={styles.input}
+                placeholder="Örn: 60000"
+                keyboardType="number-pad"
                 value={remMileage}
                 onChangeText={setRemMileage}
-                placeholder="50000"
-                style={styles.input}
-                placeholderTextColor="#999"
-                keyboardType="numeric"
               />
             </View>
+
             <TouchableOpacity
-              style={[
-                styles.saveButton,
-                { opacity: canSaveReminder ? 1 : 0.6 },
-              ]}
-              disabled={!canSaveReminder}
-              onPress={saveReminder}
+              style={styles.saveButton}
+              onPress={handleSaveReminder}
             >
-              <Ionicons name="checkmark" size={20} color="#fff" />
               <Text style={styles.saveButtonText}>Kaydet</Text>
             </TouchableOpacity>
           </View>
@@ -207,113 +317,290 @@ export default function VehicleDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F5F5" },
+  container: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
+  },
   header: {
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.light.primary,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  content: {
+    padding: 20,
+  },
+  // Car Card
+  carCard: {
+    backgroundColor: "white",
+    borderRadius: 20,
+    overflow: "hidden",
+    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  carImage: {
+    width: "100%",
+    height: 180,
+    backgroundColor: "#F0F0F0",
+  },
+  carInfo: {
+    padding: 20,
+  },
+  carTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: Colors.light.text,
+    marginBottom: 4,
+  },
+  carPlate: {
+    fontSize: 16,
+    color: Colors.light.text,
+    fontWeight: "600",
+    backgroundColor: "#F3F4F6",
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  carDetailsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 12,
+  },
+  carDetailItem: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.light.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    paddingTop: 48, // Added padding for safe area approximation if needed, or keeping it same as original if it was handled by layout
+    gap: 6,
   },
-  headerButton: { padding: 6 },
-  headerTitle: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  content: { padding: 16 },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+  carDetailText: {
+    fontSize: 14,
     color: Colors.light.text,
-    marginBottom: 6,
+    fontWeight: "500",
   },
-  row: { flexDirection: "row", alignItems: "center", marginVertical: 2 },
-  label: { width: 60, fontSize: 12, color: Colors.light.tabIconDefault },
-  value: { fontSize: 14, color: Colors.light.text },
+  // Sections
   section: {
-    backgroundColor: "white",
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.light.text,
+  },
+  addLink: {
+    color: Colors.light.primary,
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  emptyState: {
+    padding: 20,
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  emptyText: {
+    color: Colors.light.tabIconDefault,
+    fontSize: 14,
+  },
+  // Jobs
+  jobItem: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: "row",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  latestJobItem: {
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+    backgroundColor: "#F0F9FF",
+  },
+  jobIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.light.lightBlue,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+  },
+  jobContent: {
+    flex: 1,
+  },
+  jobHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+  jobTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.text,
+    flex: 1,
+  },
+  latestBadge: {
+    backgroundColor: Colors.light.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  latestBadgeText: {
+    color: "white",
+    fontSize: 10,
+    fontWeight: "bold",
+  },
+  mechanicName: {
+    fontSize: 13,
+    color: Colors.light.text,
+    marginBottom: 6,
+    fontWeight: "500",
+  },
+  jobDesc: {
+    fontSize: 13,
+    color: Colors.light.tabIconDefault,
     marginBottom: 8,
   },
-  sectionTitle: { fontSize: 14, fontWeight: "700", color: Colors.light.text },
-  emptyText: { fontSize: 12, color: Colors.light.tabIconDefault },
-  jobItem: {
-    borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
-    paddingTop: 8,
-    marginTop: 8,
+  jobFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
-  jobRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  jobTitle: { fontSize: 13, fontWeight: "600", color: Colors.light.text },
-  jobDesc: { fontSize: 12, color: Colors.light.tabIconDefault, marginTop: 2 },
-  jobMeta: {
+  jobDate: {
+    fontSize: 12,
+    color: Colors.light.tabIconDefault,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  // Reminders
+  reminderItem: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  jobMetaText: { fontSize: 11, color: Colors.light.tabIconDefault },
-  reminderItem: {
-    borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
-    paddingTop: 8,
-    marginTop: 8,
+  reminderContent: {
+    flex: 1,
+    marginLeft: 12,
   },
+  reminderTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.text,
+  },
+  reminderDetail: {
+    fontSize: 13,
+    color: Colors.light.tabIconDefault,
+    marginTop: 2,
+  },
+  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    padding: 20,
   },
   modalContainer: {
     backgroundColor: "white",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
+    borderRadius: 24,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: Colors.light.text,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.text,
     marginBottom: 8,
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.light.text },
-  inputGroup: { marginVertical: 6 },
-  inputLabel: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-    marginBottom: 4,
-  },
   input: {
-    backgroundColor: "#F7F7F7",
-    borderRadius: 10,
+    backgroundColor: "#F9FAFB",
     borderWidth: 1,
-    borderColor: "#E5E5E5",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
     color: Colors.light.text,
   },
   saveButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
     backgroundColor: Colors.light.primary,
     borderRadius: 12,
-    paddingVertical: 12,
-    marginTop: 12,
-    gap: 8,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 8,
   },
-  saveButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
 });

@@ -1,5 +1,6 @@
 import Colors from "@/constants/Colors";
-import { customers } from "@/constants/mockData";
+import { useAuthStore } from "@/store/authStore"; // AuthStore
+import { useDataStore } from "@/store/dataStore"; // Veritabanı
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -23,26 +24,42 @@ export default function CustomerLoginScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert("Hata", "Lütfen tüm alanları doldurun.");
+    // 1. Boş alan kontrolü
+    if (!email.trim() || !password.trim()) {
+      Alert.alert("Hata", "Lütfen e-posta ve şifrenizi girin.");
       return;
     }
 
     setLoading(true);
 
-    // Mock login check
-    const customer = customers.find((user) => user.email === email);
+    // 2. Veritabanından (Store) müşterileri çek
+    // Zustand store'dan anlık veriyi alıyoruz
+    const allCustomers = useDataStore.getState().customers;
+
+    // 3. E-posta eşleşmesi (Büyük/küçük harf duyarlılığını kaldırarak)
+    const foundCustomer = allCustomers.find(
+      (user) => user.email.trim().toLowerCase() === email.trim().toLowerCase()
+    );
 
     setTimeout(() => {
       setLoading(false);
-      if (customer) {
-        Alert.alert("Başarılı", "Giriş başarılı!", [
+
+      // 4. Şifre Kontrolü
+      if (foundCustomer && foundCustomer.password === password) {
+        // --- BAŞARILI GİRİŞ ---
+        // AuthStore'a kullanıcıyı kaydet
+        useAuthStore.getState().login(foundCustomer, "customer");
+
+        Alert.alert("Başarılı", `Hoş geldin ${foundCustomer.name}!`, [
           {
             text: "Tamam",
             onPress: () => router.replace("/customer/(tabs)/home"),
           },
         ]);
       } else {
+        // --- HATALI GİRİŞ ---
+        // Güvenlik gereği "E-posta yanlış" veya "Şifre yanlış" demek yerine
+        // genel bir hata mesajı vermek daha iyidir.
         Alert.alert("Hata", "E-posta veya şifre hatalı.");
       }
     }, 1000);
@@ -156,7 +173,7 @@ export default function CustomerLoginScreen() {
             <View style={styles.demoInfo}>
               <Text style={styles.demoTitle}>Demo Bilgileri:</Text>
               <Text style={styles.demoText}>
-                E-posta: enes.ozturk@example.com
+                E-posta: enes@example.com (veya yeni kayıt olduğunuz e-posta)
               </Text>
               <Text style={styles.demoText}>Şifre: 123456</Text>
             </View>

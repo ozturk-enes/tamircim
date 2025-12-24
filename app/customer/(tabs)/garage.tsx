@@ -1,16 +1,17 @@
-import VehicleCard from "@/components/VehicleCard";
 import Colors from "@/constants/Colors";
-import {
-  customers,
-  cars as mockCars,
-  reminders as mockReminders,
-  serviceRecords,
-} from "@/constants/mockData";
-import { Car, Reminder, ServiceRecord } from "@/types/schema";
+import { useAuthStore } from "@/store/authStore";
+import { useDataStore } from "@/store/dataStore";
+import { Car, Job, Reminder } from "@/types/schema";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useReducer, useState } from "react";
+import * as ImagePicker from "expo-image-picker";
+import { LinearGradient } from "expo-linear-gradient";
+import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
   FlatList,
+  Image,
   Modal,
   ScrollView,
   StyleSheet,
@@ -20,629 +21,844 @@ import {
   View,
 } from "react-native";
 
-type ModalState = {
-  addVehicle: boolean;
-  detail: boolean;
-  reminder: boolean;
-};
+const { width } = Dimensions.get("window");
 
-type ModalAction =
-  | { type: "openAdd" }
-  | { type: "closeAdd" }
-  | { type: "openDetail" }
-  | { type: "closeDetail" }
-  | { type: "openReminder" }
-  | { type: "closeReminder" };
+export default function GarageScreen() {
+  // --- STORE INTEGRATION ---
+  const currentUser = useAuthStore((state) => state.user);
+  const allCars = useDataStore((state) => state.cars);
+  const allJobs = useDataStore((state) => state.jobs);
+  const mechanics = useDataStore((state) => state.mechanics);
+  // Reminderlar store'da tanımlı değilse boş array varsayalım (DataStore güncellemesine bağlı)
+  const allReminders = useDataStore((state) => state.reminders) || [];
 
-function modalReducer(state: ModalState, action: ModalAction): ModalState {
-  switch (action.type) {
-    case "openAdd":
-      return { ...state, addVehicle: true };
-    case "closeAdd":
-      return { ...state, addVehicle: false };
-    case "openDetail":
-      return { ...state, detail: true };
-    case "closeDetail":
-      return { ...state, detail: false };
-    case "openReminder":
-      return { ...state, reminder: true };
-    case "closeReminder":
-      return { ...state, reminder: false };
-    default:
-      return state;
-  }
-}
+  const addCar = useDataStore((state) => state.addCar);
+  const removeCar = useDataStore((state) => state.removeCar);
+  const addReminder = useDataStore((state) => state.addReminder);
+  const toggleReminder = useDataStore((state) => state.toggleReminder);
+  const rateJob = useDataStore((state) => state.rateJob);
 
-export default function GarageTab() {
-  const currentUser = customers[0];
-  const userCars = mockCars.filter((c) => c.ownerId === currentUser.id);
-  const [cars, setCars] = useState<Car[]>(userCars);
-
-  const [selectedCar, setSelectedCar] = useState<Car | null>(null);
-  const [state, dispatch] = useReducer(modalReducer, {
-    addVehicle: false,
-    detail: false,
-    reminder: false,
-  });
-
-  const [detailTab, setDetailTab] = useState<"history" | "reminders">(
-    "history"
+  // Kullanıcının araçları
+  const myCars = useMemo(
+    () => allCars.filter((c) => c.ownerId === currentUser?.id),
+    [allCars, currentUser?.id]
   );
-  const [ratingModalVisible, setRatingModalVisible] = useState(false);
-  const [ratingJobId, setRatingJobId] = useState<string | null>(null);
-  const [ratingValue, setRatingValue] = useState<number>(0);
 
+  // --- STATE MANAGEMENT ---
+  const [selectedCar, setSelectedCar] = useState<Car | null>(null);
+
+  // Modals
+  const [isAddModalVisible, setAddModalVisible] = useState(false);
+  const [isDetailModalVisible, setDetailModalVisible] = useState(false);
+  const [isReminderModalVisible, setReminderModalVisible] = useState(false);
+
+  // Form States (Araç Ekleme)
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [plate, setPlate] = useState("");
+  const [imageUri, setImageUri] = useState<string | null>(null);
+  const [isImageLoading, setIsImageLoading] = useState(false);
 
-  const [remindersByCar, setRemindersByCar] = useState<
-    Record<string, Reminder[]>
-  >(() => {
-    const grouped: Record<string, Reminder[]> = {};
-    mockReminders.forEach((r) => {
-      if (!grouped[r.carId]) grouped[r.carId] = [];
-      grouped[r.carId].push(r);
-    });
-    return grouped;
-  });
-  const [editingReminderId, setEditingReminderId] = useState<string | null>(
-    null
-  );
+  // Image Picker
+  const pickImage = async () => {
+    try {
+      // 1. İzin Kontrolü
+      const { status } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "İzin Gerekli",
+          "Galeriye erişim izni vermeniz gerekmektedir. Lütfen ayarlardan izin verin.",
+          [{ text: "Tamam" }]
+        );
+        return;
+      }
+
+      setIsImageLoading(true);
+
+      // 2. Galeri Açma
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.5, // Optimize size
+      });
+
+      if (!result.canceled) {
+        const asset = result.assets[0];
+
+        // 3. Dosya Boyutu Kontrolü (5MB = 5 * 1024 * 1024 bytes)
+        const MAX_SIZE = 5 * 1024 * 1024;
+        if (asset.fileSize && asset.fileSize > MAX_SIZE) {
+          Alert.alert("Boyut Hatası", "Dosya boyutu 5MB'dan büyük olamaz.");
+          return;
+        }
+
+        // 4. Format Kontrolü
+        if (asset.type !== "image") {
+          Alert.alert(
+            "Format Hatası",
+            "Lütfen geçerli bir fotoğraf dosyası seçin (JPEG/PNG)."
+          );
+          return;
+        }
+
+        setImageUri(asset.uri);
+      }
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Hata", "Fotoğraf seçilirken bir hata oluştu.");
+    } finally {
+      setIsImageLoading(false);
+    }
+  };
+
+  // Form States (Hatırlatıcı)
   const [remTitle, setRemTitle] = useState("");
   const [remDate, setRemDate] = useState("");
   const [remMileage, setRemMileage] = useState("");
 
-  const resetVehicleForm = () => {
+  // Rating States
+  const [isRatingModalVisible, setRatingModalVisible] = useState(false);
+  const [ratingJobId, setRatingJobId] = useState<string | null>(null);
+  const [ratingScore, setRatingScore] = useState(5);
+  const [ratingComment, setRatingComment] = useState("");
+
+  // Tab State (Detay Sayfası)
+  const [detailTab, setDetailTab] = useState<"history" | "reminders">(
+    "history"
+  );
+
+  // --- ACTIONS ---
+
+  const handleRateJob = () => {
+    if (ratingJobId && ratingScore > 0) {
+      rateJob(ratingJobId, ratingScore, ratingComment);
+      setRatingModalVisible(false);
+      setRatingJobId(null);
+      setRatingScore(5);
+      setRatingComment("");
+      Alert.alert("Teşekkürler", "Değerlendirmeniz alındı.");
+    } else {
+      Alert.alert("Hata", "Lütfen bir puan verin.");
+    }
+  };
+
+  const handleSaveCar = () => {
+    if (!brand || !model || !plate || !year) {
+      Alert.alert("Hata", "Lütfen tüm alanları doldurun.");
+      return;
+    }
+
+    if (!currentUser) return;
+
+    const newCar: Car = {
+      id: Date.now().toString(),
+      ownerId: currentUser.id,
+      brand: brand.trim(),
+      model: model.trim(),
+      year: parseInt(year),
+      plate: plate.trim().toUpperCase(),
+      color: "Bilinmiyor",
+      fuelType: "Gasoline", // Varsayılan
+      // Rastgele bir araba görseli (Unsplash source) veya seçilen görsel
+      image:
+        imageUri ||
+        `https://source.unsplash.com/800x600/?car,${brand},${model}`,
+      photoUrl: imageUri || undefined,
+      photoMetadata: imageUri
+        ? {
+            size: 0, // Mock size
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          }
+        : undefined,
+    };
+
+    addCar(newCar);
+    setAddModalVisible(false);
+
+    // Reset Form
     setBrand("");
     setModel("");
     setYear("");
     setPlate("");
+    setImageUri(null);
   };
 
-  const resetReminderForm = () => {
-    setEditingReminderId(null);
+  const handleDeleteCar = () => {
+    if (!selectedCar) return;
+
+    Alert.alert(
+      "Aracı Sil",
+      "Bu araçla ilgili tüm bilgiler silinecek. Emin misiniz?",
+      [
+        { text: "Vazgeç", style: "cancel" },
+        {
+          text: "Sil",
+          style: "destructive",
+          onPress: () => {
+            removeCar(selectedCar.id);
+            setDetailModalVisible(false);
+            setSelectedCar(null);
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSaveReminder = () => {
+    if (!selectedCar || !remTitle) {
+      Alert.alert("Hata", "Başlık zorunludur.");
+      return;
+    }
+
+    const newReminder: Reminder = {
+      id: Date.now().toString(),
+      carId: selectedCar.id,
+      userId: currentUser?.id || "unknown",
+      type: "Other", // Default type
+      title: remTitle,
+      dueDate: remDate,
+      dueMileage: remMileage ? parseInt(remMileage) : undefined,
+      isCompleted: false,
+    };
+
+    addReminder(newReminder);
+
+    setReminderModalVisible(false);
     setRemTitle("");
     setRemDate("");
     setRemMileage("");
   };
 
-  const renderItem = ({ item }: { item: Car }) => (
-    <VehicleCard
-      car={item}
+  // Seçili aracın geçmiş işlemleri
+  const carJobs = useMemo(() => {
+    if (!selectedCar) return [];
+    return allJobs.filter((job) => job.carId === selectedCar.id);
+  }, [selectedCar, allJobs]);
+
+  // Seçili aracın hatırlatıcıları
+  const carReminders = useMemo(() => {
+    if (!selectedCar) return [];
+    return allReminders.filter((r) => r.carId === selectedCar.id);
+  }, [selectedCar, allReminders]);
+
+  // --- RENDER ITEMS ---
+
+  const renderCarItem = ({ item }: { item: Car }) => (
+    <TouchableOpacity
+      style={styles.carCard}
+      activeOpacity={0.9}
       onPress={() => {
         setSelectedCar(item);
-        dispatch({ type: "openDetail" });
+        setDetailModalVisible(true);
       }}
-    />
+    >
+      <Image
+        source={{
+          uri:
+            item.image ||
+            "https://images.unsplash.com/photo-1494976388531-d1058494cdd8?q=80&w=1000&auto=format&fit=crop",
+        }}
+        style={styles.carImage}
+        resizeMode="cover"
+      />
+      <View style={styles.carInfo}>
+        <View>
+          <Text style={styles.carBrandModel}>
+            {item.brand} {item.model}
+          </Text>
+          <Text style={styles.carPlate}>{item.plate}</Text>
+        </View>
+        <View style={styles.carYearBadge}>
+          <Text style={styles.carYearText}>{item.year}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
   );
-
-  const canSaveVehicle = useMemo(() => {
-    return (
-      brand.trim() !== "" &&
-      model.trim() !== "" &&
-      plate.trim() !== "" &&
-      /^\d{4}$/.test(year.trim())
-    );
-  }, [brand, model, plate, year]);
-
-  const saveVehicle = () => {
-    if (!canSaveVehicle) return;
-    const newCar: Car = {
-      id: String(Date.now()),
-      ownerId: currentUser.id,
-      brand: brand.trim(),
-      model: model.trim(),
-      year: Number(year.trim()),
-      plate: plate.trim(),
-      color: "",
-      image: undefined,
-    };
-    setCars((prev) => [newCar, ...prev]);
-    dispatch({ type: "closeAdd" });
-    resetVehicleForm();
-  };
-
-  const canSaveReminder = useMemo(
-    () =>
-      remTitle.trim().length > 0 &&
-      (remDate.trim().length > 0 || remMileage.trim().length > 0),
-    [remTitle, remDate, remMileage]
-  );
-
-  const saveReminder = () => {
-    if (!selectedCar || !canSaveReminder) return;
-    const carId = selectedCar.id;
-    const entry: Reminder = {
-      id: editingReminderId ?? String(Date.now()),
-      carId,
-      title: remTitle.trim(),
-      dueDate: remDate.trim() || undefined,
-      dueMileage: remMileage.trim() ? Number(remMileage.trim()) : undefined,
-      isCompleted: false,
-    };
-    setRemindersByCar((prev) => {
-      const list = prev[carId] || [];
-      const updated = editingReminderId
-        ? list.map((r) => (r.id === editingReminderId ? entry : r))
-        : [entry, ...list];
-      return { ...prev, [carId]: updated };
-    });
-    dispatch({ type: "closeReminder" });
-    resetReminderForm();
-  };
-
-  const openEditReminder = (r: Reminder) => {
-    setEditingReminderId(r.id);
-    setRemTitle(r.title);
-    setRemDate(r.dueDate ?? "");
-    setRemMileage(r.dueMileage ? String(r.dueMileage) : "");
-    dispatch({ type: "openReminder" });
-  };
-
-  const toggleReminderCompleted = (carId: string, reminderId: string) => {
-    setRemindersByCar((prev) => {
-      const list = prev[carId] || [];
-      const updated = list.map((r) =>
-        r.id === reminderId ? { ...r, isCompleted: !r.isCompleted } : r
-      );
-      return { ...prev, [carId]: updated };
-    });
-  };
-
-  const getStatusLabel = (status: ServiceRecord["status"]) => {
-    switch (status) {
-      case "pending":
-        return "Bekleniyor";
-      case "in_progress":
-        return "Devam ediyor";
-      case "completed":
-        return "Tamamlandı";
-      case "accepted":
-        return "Kabul edildi";
-      case "rejected":
-        return "Reddedildi";
-      default:
-        return status;
-    }
-  };
-
-  const getStatusIcon = (status: ServiceRecord["status"]) => {
-    if (status === "completed") {
-      return <Text style={{ color: Colors.light.success }}>✓</Text>;
-    }
-    if (status === "pending") {
-      return <Text style={{ color: "#9E9E9E" }}>●</Text>;
-    }
-    if (status === "rejected") {
-      return <Text style={{ color: "#FF0000" }}>●</Text>;
-    }
-    if (status === "in_progress" || status === "accepted") {
-      return <Text style={{ color: "#2196F3" }}>●</Text>;
-    }
-    return null;
-  };
-
-  const jobsForSelected: ServiceRecord[] = useMemo(() => {
-    if (!selectedCar) return [];
-    return serviceRecords.filter((j) => j.carId === selectedCar.id);
-  }, [selectedCar]);
-
-  const remindersForSelected: Reminder[] = useMemo(() => {
-    if (!selectedCar) return [];
-    return remindersByCar[selectedCar.id] || [];
-  }, [selectedCar, remindersByCar]);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Araçlarım</Text>
+      {/* Header */}
+      <LinearGradient
+        colors={[Colors.light.lightBlue, Colors.light.background]}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Garajım</Text>
+            <Text style={styles.headerSubtitle}>
+              {myCars.length} Araç Kayıtlı
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setAddModalVisible(true)}
+          >
+            <Ionicons name="add" size={24} color={Colors.light.primary} />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
+
+      {/* Car List */}
       <FlatList
-        data={cars}
-        renderItem={renderItem}
+        data={myCars}
+        renderItem={renderCarItem}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={6}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        updateCellsBatchingPeriod={50}
-        removeClippedSubviews
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="car-sport-outline" size={64} color="#CCC" />
+            <Text style={styles.emptyText}>Henüz bir araç eklemediniz.</Text>
+            <Text style={styles.emptySubText}>
+              "Araç Ekle" butonunu kullanarak başlayın.
+            </Text>
+          </View>
+        }
       />
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => dispatch({ type: "openAdd" })}
-        activeOpacity={0.8}
+      {/* --- ADD CAR MODAL --- */}
+      <Modal
+        visible={isAddModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setAddModalVisible(false)}
       >
-        <Ionicons name="add" size={24} color={Colors.light.primary} />
-        <Text style={styles.addButtonText}>Araç Ekle</Text>
-      </TouchableOpacity>
-
-      <Modal visible={state.addVehicle} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Yeni Araç</Text>
-              <TouchableOpacity onPress={() => dispatch({ type: "closeAdd" })}>
-                <Ionicons name="close" size={22} color={"#999"} />
+              <Text style={styles.modalTitle}>Yeni Araç Ekle</Text>
+              <TouchableOpacity onPress={() => setAddModalVisible(false)}>
+                <Ionicons name="close" size={24} color={Colors.light.text} />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Marka</Text>
-              <TextInput
-                value={brand}
-                onChangeText={setBrand}
-                placeholder="Örn: Toyota"
-                style={styles.input}
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Model</Text>
-              <TextInput
-                value={model}
-                onChangeText={setModel}
-                placeholder="Örn: Corolla"
-                style={styles.input}
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.inputRow}>
-              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.inputLabel}>Yıl</Text>
-                <TextInput
-                  value={year}
-                  onChangeText={setYear}
-                  placeholder="Örn: 2022"
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  keyboardType="numeric"
-                  maxLength={4}
-                />
-              </View>
-              <View style={[styles.inputGroup, { flex: 2, marginLeft: 8 }]}>
-                <Text style={styles.inputLabel}>Plaka</Text>
-                <TextInput
-                  value={plate}
-                  onChangeText={setPlate}
-                  placeholder="Örn: 34 ABC 123"
-                  style={styles.input}
-                  placeholderTextColor="#999"
-                  autoCapitalize="characters"
-                />
-              </View>
-            </View>
+            <View style={styles.formContainer}>
+              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+                {isImageLoading ? (
+                  <ActivityIndicator
+                    size="large"
+                    color={Colors.light.primary}
+                    style={{ marginTop: 50 }}
+                  />
+                ) : imageUri ? (
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.pickedImage}
+                  />
+                ) : (
+                  <View style={styles.imagePlaceholder}>
+                    <Ionicons
+                      name="camera-outline"
+                      size={32}
+                      color={Colors.light.primary}
+                    />
+                    <Text style={styles.imagePlaceholderText}>
+                      Araç Fotoğrafı Ekle
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.saveButton, { opacity: canSaveVehicle ? 1 : 0.6 }]}
-              onPress={saveVehicle}
-              disabled={!canSaveVehicle}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="checkmark" size={20} color="#fff" />
-              <Text style={styles.saveButtonText}>Kaydet</Text>
-            </TouchableOpacity>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Marka</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Örn: Toyota"
+                  value={brand}
+                  onChangeText={setBrand}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Model</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Örn: Corolla"
+                  value={model}
+                  onChangeText={setModel}
+                />
+              </View>
+              <View style={styles.row}>
+                <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                  <Text style={styles.label}>Yıl</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="2023"
+                    keyboardType="number-pad"
+                    value={year}
+                    onChangeText={setYear}
+                    maxLength={4}
+                  />
+                </View>
+                <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
+                  <Text style={styles.label}>Plaka</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="34 ABC 123"
+                    autoCapitalize="characters"
+                    value={plate}
+                    onChangeText={setPlate}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveCar}
+              >
+                <Text style={styles.saveButtonText}>Kaydet</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
-      <Modal visible={state.detail} transparent animationType="slide">
+      {/* --- CAR DETAIL MODAL --- */}
+      <Modal
+        visible={isDetailModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setDetailModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Araç Detayı</Text>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <TouchableOpacity
-                  onPress={() => setDetailTab("history")}
-                  style={{ marginRight: 12 }}
-                >
-                  <Ionicons
-                    name={detailTab === "history" ? "list" : "list-outline"}
-                    size={22}
-                    color={Colors.light.primary}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setDetailTab("reminders")}
-                  style={{ marginRight: 12 }}
-                >
-                  <Ionicons
-                    name={detailTab === "reminders" ? "alarm" : "alarm-outline"}
-                    size={22}
-                    color={Colors.light.primary}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => dispatch({ type: "closeDetail" })}
-                >
-                  <Ionicons name="close" size={22} color={"#999"} />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <ScrollView style={{ maxHeight: 600 }}>
-              {selectedCar && (
-                <View style={styles.card}>
-                  <Text style={styles.cardTitle}>
-                    {selectedCar.brand} {selectedCar.model}
-                  </Text>
-                  <View style={styles.row}>
-                    <Text style={styles.label}>Plaka</Text>
-                    <Text style={styles.value}>{selectedCar.plate}</Text>
+          <View style={[styles.modalContainer, { height: "80%" }]}>
+            {selectedCar && (
+              <>
+                <View style={styles.modalHeader}>
+                  <View>
+                    <Text style={styles.modalTitle}>
+                      {selectedCar.brand} {selectedCar.model}
+                    </Text>
+                    <Text style={styles.modalSubtitle}>
+                      {selectedCar.plate}
+                    </Text>
                   </View>
-                </View>
-              )}
-
-              {detailTab === "history" && (
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Geçmiş İşlemler</Text>
-                  </View>
-                  {jobsForSelected.length === 0 ? (
-                    <Text style={styles.emptyText}>Kayıt bulunamadı</Text>
-                  ) : (
-                    jobsForSelected.map((job) => (
-                      <View key={job.id} style={styles.jobItem}>
-                        <View style={styles.jobRow}>
-                          <Ionicons
-                            name="build"
-                            size={16}
-                            color={Colors.light.primary}
-                          />
-                          <Text style={styles.jobTitle}>{job.title}</Text>
-                        </View>
-                        <Text style={styles.jobDesc}>
-                          {job.description || ""}
-                        </Text>
-                        <View style={styles.jobMeta}>
-                          <Text style={styles.jobMetaText}>
-                            {job.date
-                              ? new Date(job.date).toLocaleDateString()
-                              : "—"}
-                          </Text>
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              gap: 6,
-                            }}
-                          >
-                            {getStatusIcon(job.status)}
-                            <Text style={styles.jobMetaText}>
-                              {getStatusLabel(job.status)}
-                            </Text>
-                          </View>
-                        </View>
-                        {job.status === "completed" && (
-                          <TouchableOpacity
-                            style={[styles.saveButton, { marginTop: 8 }]}
-                            onPress={() => {
-                              setRatingJobId(job.id);
-                              setRatingModalVisible(true);
-                            }}
-                          >
-                            <Ionicons name="star" size={20} color="#fff" />
-                            <Text style={styles.saveButtonText}>
-                              Değerlendir
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    ))
-                  )}
-                </View>
-              )}
-
-              {detailTab === "reminders" && (
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionTitle}>Hatırlatıcılar</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
                     <TouchableOpacity
-                      onPress={() => dispatch({ type: "openReminder" })}
+                      onPress={handleDeleteCar}
+                      style={{ marginRight: 16 }}
                     >
                       <Ionicons
-                        name="add"
-                        size={20}
-                        color={Colors.light.primary}
+                        name="trash-outline"
+                        size={24}
+                        color="#DC3545"
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setDetailModalVisible(false)}
+                    >
+                      <Ionicons
+                        name="close"
+                        size={24}
+                        color={Colors.light.text}
                       />
                     </TouchableOpacity>
                   </View>
-                  {remindersForSelected.length === 0 ? (
-                    <Text style={styles.emptyText}>Henüz hatırlatıcı yok</Text>
+                </View>
+
+                {/* Tabs */}
+                <View style={styles.tabContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.tabButton,
+                      detailTab === "history" && styles.activeTab,
+                    ]}
+                    onPress={() => setDetailTab("history")}
+                  >
+                    <Text
+                      style={[
+                        styles.tabText,
+                        detailTab === "history" && styles.activeTabText,
+                      ]}
+                    >
+                      Geçmiş İşlemler
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.tabButton,
+                      detailTab === "reminders" && styles.activeTab,
+                    ]}
+                    onPress={() => setDetailTab("reminders")}
+                  >
+                    <Text
+                      style={[
+                        styles.tabText,
+                        detailTab === "reminders" && styles.activeTabText,
+                      ]}
+                    >
+                      Hatırlatıcılar
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  style={styles.detailContent}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {detailTab === "history" ? (
+                    carJobs.length > 0 ? (
+                      carJobs.map((job: Job) => {
+                        const mechanic = mechanics.find(
+                          (m) => m.id === job.mechanicId
+                        );
+                        // Tamamlanan işlerde ustanın notunu, diğerlerinde müşteri notunu veya başlığı göster
+                        const description =
+                          job.status === "completed" && job.workDescription
+                            ? job.workDescription
+                            : job.customerNote || job.title;
+
+                        return (
+                          <View key={job.id} style={styles.historyCard}>
+                            {/* Header: Mechanic Name & Date */}
+                            <View style={styles.historyHeader}>
+                              <View style={styles.mechanicInfo}>
+                                <Ionicons
+                                  name="person-circle"
+                                  size={24}
+                                  color={Colors.light.primary}
+                                />
+                                <Text style={styles.mechanicName}>
+                                  {mechanic
+                                    ? mechanic.name
+                                    : "Bilinmeyen Tamirci"}
+                                </Text>
+                              </View>
+                              <Text style={styles.historyDate}>
+                                {new Date(
+                                  job.completedAt || job.createdAt
+                                ).toLocaleDateString("tr-TR")}
+                              </Text>
+                            </View>
+
+                            {/* Body: Description */}
+                            <View style={styles.historyBody}>
+                              <Text style={styles.historyLabel}>Açıklama:</Text>
+                              <Text
+                                style={styles.historyDescription}
+                                numberOfLines={3}
+                              >
+                                {description}
+                              </Text>
+                            </View>
+
+                            {/* Footer: Status & Cost */}
+                            <View style={styles.historyFooter}>
+                              <View
+                                style={[
+                                  styles.statusBadge,
+                                  {
+                                    backgroundColor:
+                                      job.status === "completed"
+                                        ? "#DCFCE7" // Green
+                                        : job.status === "pending"
+                                        ? "#FEF3C7" // Yellow
+                                        : job.status === "rejected" ||
+                                          job.status === "cancelled"
+                                        ? "#FEE2E2" // Red
+                                        : "#DBEAFE", // Blue (Accepted/In Progress)
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.statusText,
+                                    {
+                                      color:
+                                        job.status === "completed"
+                                          ? "#166534"
+                                          : job.status === "pending"
+                                          ? "#92400E"
+                                          : job.status === "rejected" ||
+                                            job.status === "cancelled"
+                                          ? "#991B1B"
+                                          : "#1E40AF",
+                                    },
+                                  ]}
+                                >
+                                  {job.status === "completed"
+                                    ? "Tamamlandı"
+                                    : job.status === "pending"
+                                    ? "Beklemede"
+                                    : job.status === "rejected" ||
+                                      job.status === "cancelled"
+                                    ? "İptal Edildi"
+                                    : "Devam Ediyor"}
+                                </Text>
+                              </View>
+                              {job.cost && (
+                                <Text style={styles.historyCost}>
+                                  {job.cost} ₺
+                                </Text>
+                              )}
+                            </View>
+
+                            {/* Değerlendirme Butonu (Sadece Tamamlananlar İçin) */}
+                            {job.status === "completed" && (
+                              <View
+                                style={{
+                                  marginTop: 12,
+                                  alignItems: "flex-end",
+                                }}
+                              >
+                                {job.isRated ? (
+                                  <View
+                                    style={{
+                                      flexDirection: "row",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        color: Colors.light.tabIconDefault,
+                                        marginRight: 4,
+                                        fontSize: 12,
+                                      }}
+                                    >
+                                      Değerlendirildi
+                                    </Text>
+                                    <Ionicons
+                                      name="star"
+                                      size={16}
+                                      color="#FFD700"
+                                    />
+                                    <Text
+                                      style={{
+                                        marginLeft: 4,
+                                        fontWeight: "bold",
+                                        color: Colors.light.text,
+                                      }}
+                                    >
+                                      {job.rating}
+                                    </Text>
+                                  </View>
+                                ) : (
+                                  <TouchableOpacity
+                                    style={{
+                                      flexDirection: "row",
+                                      alignItems: "center",
+                                      backgroundColor: Colors.light.primary,
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 6,
+                                      borderRadius: 16,
+                                    }}
+                                    onPress={() => {
+                                      setRatingJobId(job.id);
+                                      setRatingModalVisible(true);
+                                    }}
+                                  >
+                                    <Ionicons
+                                      name="star-outline"
+                                      size={14}
+                                      color="white"
+                                      style={{ marginRight: 4 }}
+                                    />
+                                    <Text
+                                      style={{
+                                        color: "white",
+                                        fontSize: 12,
+                                        fontWeight: "600",
+                                      }}
+                                    >
+                                      Hizmeti Değerlendir
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })
+                    ) : (
+                      <View style={styles.emptyTabState}>
+                        <Text style={styles.emptyTabText}>
+                          Geçmiş işlem bulunamadı.
+                        </Text>
+                      </View>
+                    )
                   ) : (
-                    remindersForSelected.map((r) => (
-                      <View key={r.id} style={styles.reminderItem}>
-                        <View style={styles.jobRow}>
+                    <>
+                      <TouchableOpacity
+                        style={styles.addReminderButton}
+                        onPress={() => setReminderModalVisible(true)}
+                      >
+                        <Ionicons
+                          name="add-circle"
+                          size={20}
+                          color={Colors.light.primary}
+                        />
+                        <Text style={styles.addReminderText}>
+                          Yeni Hatırlatıcı Ekle
+                        </Text>
+                      </TouchableOpacity>
+
+                      {carReminders.length > 0 ? (
+                        carReminders.map((rem: Reminder) => (
                           <TouchableOpacity
-                            onPress={() =>
-                              selectedCar &&
-                              toggleReminderCompleted(selectedCar.id, r.id)
-                            }
+                            key={rem.id}
+                            style={styles.reminderItem}
+                            onPress={() => toggleReminder(rem.id)}
+                            activeOpacity={0.7}
                           >
                             <Ionicons
                               name={
-                                r.isCompleted ? "checkbox" : "square-outline"
+                                rem.isCompleted ? "checkbox" : "square-outline"
                               }
-                              size={18}
+                              size={24}
                               color={
-                                r.isCompleted
+                                rem.isCompleted
                                   ? Colors.light.success
                                   : Colors.light.tabIconDefault
                               }
                             />
-                          </TouchableOpacity>
-                          <Ionicons name="time" size={16} color={"#FF9500"} />
-                          <Text
-                            style={[
-                              styles.jobTitle,
-                              r.isCompleted
-                                ? {
+                            <View style={{ flex: 1, marginLeft: 12 }}>
+                              <Text
+                                style={[
+                                  styles.reminderTitle,
+                                  rem.isCompleted && {
                                     textDecorationLine: "line-through",
-                                    color: Colors.light.tabIconDefault,
-                                  }
-                                : null,
-                            ]}
-                          >
-                            {r.title}
+                                    color: "#999",
+                                  },
+                                ]}
+                              >
+                                {rem.title}
+                              </Text>
+                              <Text style={styles.reminderDetail}>
+                                {rem.dueDate ||
+                                  (rem.dueMileage
+                                    ? `${rem.dueMileage} km`
+                                    : "")}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        ))
+                      ) : (
+                        <View style={styles.emptyTabState}>
+                          <Text style={styles.emptyTabText}>
+                            Hatırlatıcı yok.
                           </Text>
                         </View>
-                        {!!r.dueDate && (
-                          <Text
-                            style={[
-                              styles.jobDesc,
-                              r.isCompleted
-                                ? { textDecorationLine: "line-through" }
-                                : null,
-                            ]}
-                          >
-                            Tarih: {r.dueDate}
-                          </Text>
-                        )}
-                        {!!r.dueMileage && (
-                          <Text
-                            style={[
-                              styles.jobDesc,
-                              r.isCompleted
-                                ? { textDecorationLine: "line-through" }
-                                : null,
-                            ]}
-                          >
-                            Km: {r.dueMileage}
-                          </Text>
-                        )}
-                        <TouchableOpacity
-                          onPress={() => openEditReminder(r)}
-                          style={{ marginTop: 6 }}
-                        >
-                          <Text
-                            style={{
-                              color: Colors.light.primary,
-                              fontWeight: "600",
-                            }}
-                          >
-                            Düzenle
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    ))
+                      )}
+                    </>
                   )}
-                </View>
-              )}
-            </ScrollView>
+                </ScrollView>
+              </>
+            )}
           </View>
         </View>
       </Modal>
 
-      <Modal visible={ratingModalVisible} transparent animationType="fade">
+      {/* --- ADD REMINDER MODAL --- */}
+      <Modal visible={isReminderModalVisible} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Değerlendirme</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setRatingModalVisible(false);
-                  setRatingJobId(null);
-                  setRatingValue(0);
-                }}
-              >
-                <Ionicons name="close" size={22} color={"#999"} />
+              <Text style={styles.modalTitle}>Hatırlatıcı Ekle</Text>
+              <TouchableOpacity onPress={() => setReminderModalVisible(false)}>
+                <Ionicons name="close" size={24} color={Colors.light.text} />
               </TouchableOpacity>
             </View>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "center",
-                gap: 8,
-                marginTop: 8,
-              }}
-            >
-              {[1, 2, 3, 4, 5].map((n) => (
-                <TouchableOpacity key={n} onPress={() => setRatingValue(n)}>
-                  <Ionicons
-                    name={n <= ratingValue ? "star" : "star-outline"}
-                    size={28}
-                    color="#FFD700"
-                  />
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formContainer}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Başlık</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Örn: Muayene, Sigorta"
+                  value={remTitle}
+                  onChangeText={setRemTitle}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Tarih (Opsiyonel)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="GG.AA.YYYY"
+                  value={remDate}
+                  onChangeText={setRemDate}
+                />
+              </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Kilometre (Opsiyonel)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Örn: 60000"
+                  keyboardType="number-pad"
+                  value={remMileage}
+                  onChangeText={setRemMileage}
+                />
+              </View>
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveReminder}
+              >
+                <Text style={styles.saveButtonText}>Kaydet</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={[styles.saveButton, { marginTop: 12 }]}
-              onPress={() => {
-                setRatingModalVisible(false);
-                setRatingJobId(null);
-                setRatingValue(0);
-              }}
-            >
-              <Ionicons name="checkmark" size={20} color="#fff" />
-              <Text style={styles.saveButtonText}>Kaydet</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
-
-      <Modal visible={state.reminder} transparent animationType="slide">
+      {/* --- RATING MODAL --- */}
+      <Modal
+        visible={isRatingModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRatingModalVisible(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingReminderId
-                  ? "Hatırlatıcıyı Düzenle"
-                  : "Hatırlatıcı Ekle"}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  dispatch({ type: "closeReminder" });
-                  resetReminderForm();
-                }}
-              >
-                <Ionicons name="close" size={22} color={"#999"} />
+              <Text style={styles.modalTitle}>Hizmeti Değerlendir</Text>
+              <TouchableOpacity onPress={() => setRatingModalVisible(false)}>
+                <Ionicons name="close" size={24} color={Colors.light.text} />
               </TouchableOpacity>
             </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Başlık</Text>
-              <TextInput
-                value={remTitle}
-                onChangeText={setRemTitle}
-                placeholder="Örn: Bakım"
-                style={styles.input}
-                placeholderTextColor="#999"
-              />
+            <View style={styles.formContainer}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "center",
+                  marginBottom: 20,
+                }}
+              >
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <TouchableOpacity
+                    key={star}
+                    onPress={() => setRatingScore(star)}
+                  >
+                    <Ionicons
+                      name={star <= ratingScore ? "star" : "star-outline"}
+                      size={40}
+                      color="#FFD700"
+                      style={{ marginHorizontal: 4 }}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Yorumunuz (Opsiyonel)</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { height: 80, textAlignVertical: "top" },
+                  ]}
+                  placeholder="Hizmet nasıldı?"
+                  value={ratingComment}
+                  onChangeText={setRatingComment}
+                  multiline
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleRateJob}
+              >
+                <Text style={styles.saveButtonText}>Gönder</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Tarih (YYYY-MM-DD)</Text>
-              <TextInput
-                value={remDate}
-                onChangeText={setRemDate}
-                placeholder="2025-12-30"
-                style={styles.input}
-                placeholderTextColor="#999"
-              />
-            </View>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Kilometre</Text>
-              <TextInput
-                value={remMileage}
-                onChangeText={setRemMileage}
-                placeholder="50000"
-                style={styles.input}
-                placeholderTextColor="#999"
-                keyboardType="numeric"
-              />
-            </View>
-            <TouchableOpacity
-              style={[
-                styles.saveButton,
-                { opacity: canSaveReminder ? 1 : 0.6 },
-              ]}
-              disabled={!canSaveReminder}
-              onPress={saveReminder}
-            >
-              <Ionicons name="checkmark" size={20} color="#fff" />
-              <Text style={styles.saveButtonText}>Kaydet</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -651,134 +867,421 @@ export default function GarageTab() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F5F5", padding: 16 },
-  title: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: Colors.light.secondary,
-    marginBottom: 12,
-    textAlign: "center",
-    alignSelf: "center",
+  container: {
+    flex: 1,
+    backgroundColor: Colors.light.background,
   },
-  listContent: { paddingBottom: 16 },
-  addButton: {
+  lastJobContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  lastJobHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "white",
-    borderRadius: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: Colors.light.primary,
-    borderStyle: "dashed",
-    marginTop: 8,
+    marginBottom: 4,
   },
-  addButtonText: {
-    marginLeft: 8,
+  lastJobLabel: {
+    fontSize: 12,
     color: Colors.light.primary,
     fontWeight: "600",
-    fontSize: 15,
+    marginLeft: 4,
   },
+  lastJobDetails: {
+    paddingLeft: 0,
+  },
+  lastJobTitle: {
+    fontSize: 14,
+    color: "#374151",
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  lastJobMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  lastJobDate: {
+    fontSize: 12,
+    color: "#9CA3AF",
+  },
+  lastJobMechanic: {
+    fontSize: 12,
+    color: "#6B7280",
+    marginLeft: 4,
+    flex: 1,
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: Colors.light.primary,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: Colors.light.text,
+    opacity: 0.7,
+    marginTop: 4,
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    backgroundColor: "white",
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  listContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  // Car Card Styles
+  carCard: {
+    backgroundColor: "white",
+    borderRadius: 16,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 4,
+    overflow: "hidden",
+  },
+  carImage: {
+    width: "100%",
+    height: 150,
+    backgroundColor: "#F0F0F0",
+  },
+  carInfo: {
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  carBrandModel: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: Colors.light.text,
+  },
+  carPlate: {
+    fontSize: 14,
+    color: Colors.light.tabIconDefault,
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  carYearBadge: {
+    backgroundColor: Colors.light.lightBlue,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  carYearText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.primary,
+  },
+  // Empty State
+  emptyState: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: Colors.light.text,
+    marginTop: 16,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: Colors.light.tabIconDefault,
+    marginTop: 8,
+  },
+  // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
   modalContainer: {
     backgroundColor: "white",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    minHeight: "50%",
   },
   modalHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 8,
+    alignItems: "flex-start",
+    marginBottom: 24,
   },
-  modalTitle: { fontSize: 16, fontWeight: "700", color: Colors.light.text },
-  inputGroup: { marginVertical: 6 },
-  inputLabel: {
-    fontSize: 12,
-    color: Colors.light.tabIconDefault,
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: "#F7F7F7",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
     color: Colors.light.text,
   },
-  inputRow: {
+  modalSubtitle: {
+    fontSize: 16,
+    color: Colors.light.tabIconDefault,
+    marginTop: 4,
+  },
+  // Forms
+  formContainer: {
+    gap: 16,
+  },
+  inputGroup: {
+    marginBottom: 12,
+  },
+  row: {
+    flexDirection: "row",
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.text,
+    marginBottom: 8,
+  },
+  // History Card Styles (New)
+  historyCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  historyHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  mechanicInfo: {
     flexDirection: "row",
     alignItems: "center",
+    flex: 1,
+  },
+  mechanicName: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.light.text,
+    marginLeft: 8,
+  },
+  historyDate: {
+    fontSize: 12,
+    color: "#6B7280",
+  },
+  historyBody: {
+    marginBottom: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#F3F4F6",
+  },
+  historyLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#9CA3AF",
+    marginBottom: 4,
+  },
+  historyDescription: {
+    fontSize: 14,
+    color: "#4B5563",
+    lineHeight: 20,
+  },
+  historyFooter: {
+    flexDirection: "row",
     justifyContent: "space-between",
-    marginVertical: 6,
+    alignItems: "center",
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  historyCost: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: Colors.light.primary,
+  },
+  ratingContainer: {
+    marginTop: 12,
+    alignItems: "flex-end",
+  },
+  ratedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF8E1",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  ratedText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#F57F17",
+    marginLeft: 4,
+  },
+  rateButton: {
+    backgroundColor: Colors.light.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  rateButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
+  // Inputs & Buttons (Used in Add Car Modal)
+  input: {
+    backgroundColor: "#FAFAFA",
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 16,
+    color: Colors.light.text,
+  },
+  imagePicker: {
+    height: 150,
+    backgroundColor: "#F0F0F0",
+    borderRadius: 12,
+    marginBottom: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderStyle: "dashed",
+  },
+  pickedImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  imagePlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagePlaceholderText: {
+    marginTop: 8,
+    color: Colors.light.primary,
+    fontWeight: "600",
   },
   saveButton: {
+    backgroundColor: Colors.light.primary,
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+
+  // Tabs (Used in Detail Modal)
+  tabContainer: {
+    flexDirection: "row",
+    marginBottom: 20,
+    backgroundColor: "#F5F5F5",
+    borderRadius: 12,
+    padding: 4,
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  activeTab: {
+    backgroundColor: "white",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.light.tabIconDefault,
+  },
+  activeTabText: {
+    color: Colors.light.primary,
+  },
+  detailContent: {
+    flex: 1,
+  },
+
+  // Reminders
+  addReminderButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.light.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    marginTop: 12,
-    gap: 8,
-  },
-  saveButtonText: { color: "white", fontWeight: "700", fontSize: 15 },
-  card: {
-    backgroundColor: "white",
-    borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.light.text,
-    marginBottom: 6,
-  },
-  row: { flexDirection: "row", alignItems: "center", marginVertical: 2 },
-  label: { width: 60, fontSize: 12, color: Colors.light.tabIconDefault },
-  value: { fontSize: 14, color: Colors.light.text },
-  section: {
-    backgroundColor: "white",
+    borderWidth: 1,
+    borderColor: Colors.light.primary,
+    borderStyle: "dashed",
     borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 8,
+  addReminderText: {
+    marginLeft: 8,
+    color: Colors.light.primary,
+    fontWeight: "600",
   },
-  sectionTitle: { fontSize: 14, fontWeight: "700", color: Colors.light.text },
-  emptyText: { fontSize: 12, color: Colors.light.tabIconDefault },
-  jobItem: {
-    borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
-    paddingTop: 8,
-    marginTop: 8,
-  },
-  jobRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  jobTitle: { fontSize: 13, fontWeight: "600", color: Colors.light.text },
-  jobDesc: { fontSize: 12, color: Colors.light.tabIconDefault, marginTop: 2 },
-  jobMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 6,
-  },
-  jobMetaText: { fontSize: 11, color: Colors.light.tabIconDefault },
   reminderItem: {
-    borderTopWidth: 1,
-    borderTopColor: "#F0F0F0",
-    paddingTop: 8,
-    marginTop: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: "#F9F9F9",
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  reminderTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.light.text,
+  },
+  reminderDetail: {
+    fontSize: 14,
+    color: Colors.light.tabIconDefault,
+    marginTop: 2,
+  },
+  emptyTabState: {
+    padding: 40,
+    alignItems: "center",
+  },
+  emptyTabText: {
+    color: Colors.light.tabIconDefault,
+    fontSize: 14,
   },
 });

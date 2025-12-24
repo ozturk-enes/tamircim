@@ -1,65 +1,114 @@
-import React, { useState } from 'react';
+import Colors from "@/constants/Colors";
+import { useDataStore } from "@/store/dataStore";
+import { Customer } from "@/types/schema";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
+import React, { useState } from "react";
 import {
-  StyleSheet,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import Colors from '@/constants/Colors';
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function CustomerRegisterScreen() {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleRegister = async () => {
     const { name, email, phone, password, confirmPassword } = formData;
 
-    if (!name || !email || !phone || !password || !confirmPassword) {
-      Alert.alert('Hata', 'Lütfen tüm alanları doldurun.');
+    // 1. Validasyonlar (Boş Alan Kontrolü)
+    if (
+      !name.trim() ||
+      !email.trim() ||
+      !phone.trim() ||
+      !password.trim() ||
+      !confirmPassword.trim()
+    ) {
+      Alert.alert(
+        "Hata",
+        "Kayıt olabilmek için tüm bilgileri eksiksiz doldurun."
+      );
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Hata', 'Şifreler eşleşmiyor.');
+      Alert.alert("Hata", "Şifreler eşleşmiyor.");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Hata', 'Şifre en az 6 karakter olmalıdır.');
+      Alert.alert("Hata", "Şifre en az 6 karakter olmalıdır.");
       return;
     }
 
     setLoading(true);
 
-    // Mock registration
-    setTimeout(() => {
+    // 2. E-posta Kontrolü (Veritabanında var mı?)
+    const existingCustomer = useDataStore
+      .getState()
+      .customers.find(
+        (c) => c.email.trim().toLowerCase() === email.trim().toLowerCase()
+      );
+
+    if (existingCustomer) {
       setLoading(false);
-      Alert.alert('Başarılı', 'Kayıt işlemi tamamlandı! Şimdi giriş yapabilirsiniz.', [
-        {
-          text: 'Tamam',
-          onPress: () => router.back(),
-        },
-      ]);
+      Alert.alert("Hata", "Bu e-posta adresi zaten kullanımda.");
+      return;
+    }
+
+    // 3. Yeni Müşteri Objesi Oluşturma
+    const newCustomer: Customer = {
+      id: Date.now().toString(), // Benzersiz ID
+      role: "customer",
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      address: "", // Profil sayfasından doldurulabilir
+      createdAt: new Date().toISOString(),
+      password: password,
+      profileImage: `https://ui-avatars.com/api/?name=${encodeURIComponent(
+        name
+      )}&background=random`,
+    };
+
+    setTimeout(() => {
+      // 4. Veritabanına Ekle
+      useDataStore.getState().addCustomer(newCustomer);
+
+      setLoading(false);
+
+      // 5. Başarılı Kayıt Mesajı ve Yönlendirme
+      // NOT: Otomatik giriş yapmıyoruz, kullanıcıyı login ekranına atıyoruz.
+      Alert.alert(
+        "Kayıt Başarılı",
+        "Hesabınız oluşturuldu. Lütfen giriş yapınız.",
+        [
+          {
+            text: "Giriş Yap",
+            onPress: () => router.replace("/(login)/customerLogin"), // Giriş sayfasına dön
+          },
+        ]
+      );
     }, 1500);
   };
 
@@ -73,7 +122,7 @@ export default function CustomerRegisterScreen() {
       style={styles.container}
     >
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardView}
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -81,7 +130,11 @@ export default function CustomerRegisterScreen() {
             {/* Header */}
             <View style={styles.header}>
               <View style={styles.iconContainer}>
-                <Ionicons name="person-add" size={60} color={Colors.light.primary} />
+                <Ionicons
+                  name="person-add"
+                  size={60}
+                  color={Colors.light.primary}
+                />
               </View>
               <Text style={styles.title}>Müşteri Kayıt</Text>
               <Text style={styles.subtitle}>Yeni hesap oluşturun</Text>
@@ -90,23 +143,33 @@ export default function CustomerRegisterScreen() {
             {/* Form */}
             <View style={styles.form}>
               <View style={styles.inputContainer}>
-                <Ionicons name="person" size={20} color={Colors.light.primary} style={styles.inputIcon} />
+                <Ionicons
+                  name="person"
+                  size={20}
+                  color={Colors.light.primary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Ad Soyad"
                   value={formData.name}
-                  onChangeText={(value) => handleInputChange('name', value)}
+                  onChangeText={(value) => handleInputChange("name", value)}
                   placeholderTextColor={Colors.light.tabIconDefault}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Ionicons name="mail" size={20} color={Colors.light.primary} style={styles.inputIcon} />
+                <Ionicons
+                  name="mail"
+                  size={20}
+                  color={Colors.light.primary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="E-posta"
                   value={formData.email}
-                  onChangeText={(value) => handleInputChange('email', value)}
+                  onChangeText={(value) => handleInputChange("email", value)}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   placeholderTextColor={Colors.light.tabIconDefault}
@@ -114,24 +177,34 @@ export default function CustomerRegisterScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Ionicons name="call" size={20} color={Colors.light.primary} style={styles.inputIcon} />
+                <Ionicons
+                  name="call"
+                  size={20}
+                  color={Colors.light.primary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Telefon Numarası"
                   value={formData.phone}
-                  onChangeText={(value) => handleInputChange('phone', value)}
+                  onChangeText={(value) => handleInputChange("phone", value)}
                   keyboardType="phone-pad"
                   placeholderTextColor={Colors.light.tabIconDefault}
                 />
               </View>
 
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed" size={20} color={Colors.light.primary} style={styles.inputIcon} />
+                <Ionicons
+                  name="lock-closed"
+                  size={20}
+                  color={Colors.light.primary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Şifre"
                   value={formData.password}
-                  onChangeText={(value) => handleInputChange('password', value)}
+                  onChangeText={(value) => handleInputChange("password", value)}
                   secureTextEntry={!showPassword}
                   placeholderTextColor={Colors.light.tabIconDefault}
                 />
@@ -140,7 +213,7 @@ export default function CustomerRegisterScreen() {
                   style={styles.eyeIcon}
                 >
                   <Ionicons
-                    name={showPassword ? 'eye-off' : 'eye'}
+                    name={showPassword ? "eye-off" : "eye"}
                     size={20}
                     color={Colors.light.tabIconDefault}
                   />
@@ -148,12 +221,19 @@ export default function CustomerRegisterScreen() {
               </View>
 
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed" size={20} color={Colors.light.primary} style={styles.inputIcon} />
+                <Ionicons
+                  name="lock-closed"
+                  size={20}
+                  color={Colors.light.primary}
+                  style={styles.inputIcon}
+                />
                 <TextInput
                   style={styles.input}
                   placeholder="Şifre Tekrar"
                   value={formData.confirmPassword}
-                  onChangeText={(value) => handleInputChange('confirmPassword', value)}
+                  onChangeText={(value) =>
+                    handleInputChange("confirmPassword", value)
+                  }
                   secureTextEntry={!showConfirmPassword}
                   placeholderTextColor={Colors.light.tabIconDefault}
                 />
@@ -162,7 +242,7 @@ export default function CustomerRegisterScreen() {
                   style={styles.eyeIcon}
                 >
                   <Ionicons
-                    name={showConfirmPassword ? 'eye-off' : 'eye'}
+                    name={showConfirmPassword ? "eye-off" : "eye"}
                     size={20}
                     color={Colors.light.tabIconDefault}
                   />
@@ -170,12 +250,15 @@ export default function CustomerRegisterScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.registerButton, loading && styles.registerButtonDisabled]}
+                style={[
+                  styles.registerButton,
+                  loading && styles.registerButtonDisabled,
+                ]}
                 onPress={handleRegister}
                 disabled={loading}
               >
                 <Text style={styles.registerButtonText}>
-                  {loading ? 'Kayıt yapılıyor...' : 'Kayıt Ol'}
+                  {loading ? "Kayıt yapılıyor..." : "Kayıt Ol"}
                 </Text>
               </TouchableOpacity>
 
@@ -185,8 +268,13 @@ export default function CustomerRegisterScreen() {
                 <View style={styles.dividerLine} />
               </View>
 
-              <TouchableOpacity style={styles.loginButton} onPress={handleLoginRedirect}>
-                <Text style={styles.loginButtonText}>Zaten hesabınız var mı? Giriş Yap</Text>
+              <TouchableOpacity
+                style={styles.loginButton}
+                onPress={handleLoginRedirect}
+              >
+                <Text style={styles.loginButtonText}>
+                  Zaten hesabınız var mı? Giriş Yap
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -210,10 +298,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 30,
     paddingVertical: 20,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   header: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 30,
   },
   iconContainer: {
@@ -221,7 +309,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     color: Colors.light.primary,
     marginBottom: 8,
   },
@@ -231,16 +319,16 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   form: {
-    width: '100%',
+    width: "100%",
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'white',
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "white",
     borderRadius: 12,
     marginBottom: 16,
     paddingHorizontal: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 2,
@@ -265,9 +353,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
     borderRadius: 12,
     paddingVertical: 16,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 3,
@@ -280,13 +368,13 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   registerButtonText: {
-    color: 'white',
+    color: "white",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginVertical: 24,
   },
   dividerLine: {
@@ -300,12 +388,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   loginButton: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 12,
   },
   loginButtonText: {
     color: Colors.light.primary,
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: "500",
   },
 });
