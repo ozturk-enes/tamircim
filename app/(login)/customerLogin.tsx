@@ -170,13 +170,6 @@ export default function CustomerLoginScreen() {
             </View>
 
             {/* Demo Info */}
-            <View style={styles.demoInfo}>
-              <Text style={styles.demoTitle}>Demo Bilgileri:</Text>
-              <Text style={styles.demoText}>
-                E-posta: enes@example.com (veya yeni kayıt olduğunuz e-posta)
-              </Text>
-              <Text style={styles.demoText}>Şifre: 123456</Text>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -171,12 +171,6 @@ export default function MechanicLoginScreen() {
             </View>
 
             {/* Demo Info */}
-            <View style={styles.demoInfo}>
-              <Text style={styles.demoTitle}>Demo Bilgileri:</Text>
-              {/* Seed Data'daki gerçek veriyi yazdım */}
-              <Text style={styles.demoText}>E-posta: ali@tamir.com</Text>
-              <Text style={styles.demoText}>Şifre: ali123</Text>
-            </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
