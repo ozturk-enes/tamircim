@@ -121,14 +121,12 @@ const MechanicDashboardScreen = () => {
 
     const phoneNumber = customer.phone;
 
-    // 1. Validation & Formatting
     const cleanedNumber = phoneNumber.replace(/[^\d+]/g, "");
     if (cleanedNumber.length < 3) {
       Alert.alert("Geçersiz Numara", "Telefon numarası formatı hatalı.");
       return;
     }
 
-    // 2. Confirmation
     Alert.alert(
       "Arama Onayı",
       `${customer.name} isimli müşteriyi aramak istiyor musunuz?`,
@@ -139,22 +137,9 @@ const MechanicDashboardScreen = () => {
           onPress: async () => {
             try {
               const phoneUrl = `tel:${cleanedNumber}`;
-              // canOpenURL kontrolünü kaldırıp doğrudan deniyoruz veya
-              // kontrol başarısız olsa bile hata fırlatmadan kullanıcıya numara gösteriyoruz.
-              const supported = await Linking.canOpenURL(phoneUrl);
-
-              if (supported) {
-                await Linking.openURL(phoneUrl);
-              } else {
-                // Hata vermek yerine alternatif sun
-                Alert.alert(
-                  "Arama Yapılamadı",
-                  `Cihaz bu işlemi desteklemiyor. Numara: ${phoneNumber}`
-                );
-              }
+              await Linking.openURL(phoneUrl);
             } catch (error) {
               console.error("Call error:", error);
-              // Yine de numarayı gösterelim
               Alert.alert(
                 "Hata",
                 `Arama başlatılamadı. Numara: ${phoneNumber}`

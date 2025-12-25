@@ -4,22 +4,22 @@
     "slug": "tamircim",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/carSplash.png",
     "scheme": "tamircim",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/images/carSplash.png",
+      "resizeMode": "cover",
+      "backgroundColor": "#0F172A"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/carSplash.png",
+        "backgroundColor": "#0F172A"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false

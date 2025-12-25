@@ -285,31 +285,16 @@ export default function CustomerHomeScreen() {
     if (mechanicId) setCallingMechanicId(mechanicId);
 
     try {
-      // 1. Numara Kontrolü
       if (!phoneNumber) {
         Alert.alert("Hata", "Geçerli bir telefon numarası bulunamadı.");
         if (mechanicId) setCallingMechanicId(null);
         return;
       }
 
-      // 2. Numara Formatlama
       const cleanedNumber = phoneNumber.replace(/[^\d+]/g, "");
       const phoneUrl = `tel:${cleanedNumber}`;
 
-      // 3. Platform ve Destek Kontrolü
-      const supported = await Linking.canOpenURL(phoneUrl);
-
-      if (supported) {
-        // Geri bildirim (Toast veya Alert yerine doğrudan arama, ancak loading gösteriyoruz)
-        await Linking.openURL(phoneUrl);
-      } else {
-        // Fallback: Numara Kopyalama veya Gösterme
-        Alert.alert(
-          "Arama Başlatılamadı",
-          `Cihazınız bu aramayı gerçekleştiremiyor. Numara: ${phoneNumber}`,
-          [{ text: "Tamam", style: "cancel" }]
-        );
-      }
+      await Linking.openURL(phoneUrl);
     } catch (error) {
       console.error("Phone call error:", error);
       Alert.alert("Hata", "Arama başlatılırken bir sorun oluştu.");
