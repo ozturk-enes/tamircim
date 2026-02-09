@@ -42,7 +42,7 @@ const MechanicDashboardScreen = () => {
         if (status !== "granted") {
           Alert.alert(
             "Konum İzni",
-            "Müşterilerin sizi bulabilmesi ve mesafeyi görebilmesi için konum izni gereklidir."
+            "Müşterilerin sizi bulabilmesi ve mesafeyi görebilmesi için konum izni gereklidir.",
           );
           return;
         }
@@ -101,7 +101,7 @@ const MechanicDashboardScreen = () => {
             setActiveTab("Devam Eden");
           },
         },
-      ]
+      ],
     );
   };
 
@@ -142,12 +142,12 @@ const MechanicDashboardScreen = () => {
               console.error("Call error:", error);
               Alert.alert(
                 "Hata",
-                `Arama başlatılamadı. Numara: ${phoneNumber}`
+                `Arama başlatılamadı. Numara: ${phoneNumber}`,
               );
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -191,7 +191,7 @@ const MechanicDashboardScreen = () => {
               completedAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
             }
-          : j
+          : j,
       ),
     }));
 
@@ -210,7 +210,7 @@ const MechanicDashboardScreen = () => {
         return myJobs.filter((job) => job.status === "pending");
       case "Devam Eden":
         return myJobs.filter(
-          (job) => job.status === "in_progress" || job.status === "accepted"
+          (job) => job.status === "in_progress" || job.status === "accepted",
         );
       case "Tamamlanan":
         // Tamamlananları ve reddedilenleri tarihe göre (yeniden eskiye) sırala
@@ -220,7 +220,7 @@ const MechanicDashboardScreen = () => {
             if (job.status !== "completed" && job.status !== "rejected")
               return false;
             const completedTime = new Date(
-              job.completedAt || job.updatedAt
+              job.completedAt || job.updatedAt,
             ).getTime();
             const oneDayMs = 24 * 60 * 60 * 1000;
             return Date.now() - completedTime < oneDayMs;
@@ -228,7 +228,7 @@ const MechanicDashboardScreen = () => {
           .sort(
             (a, b) =>
               new Date(b.completedAt || b.updatedAt || 0).getTime() -
-              new Date(a.completedAt || a.updatedAt || 0).getTime()
+              new Date(a.completedAt || a.updatedAt || 0).getTime(),
           );
       default:
         return [];

@@ -67,7 +67,8 @@ export default function CustomerRegisterScreen() {
     const existingCustomer = useDataStore
       .getState()
       .customers.find(
-        (c) => c.email.trim().toLowerCase() === email.trim().toLowerCase()
+        (c: Customer) =>
+          c.email.trim().toLowerCase() === email.trim().toLowerCase()
       );
 
     if (existingCustomer) {
